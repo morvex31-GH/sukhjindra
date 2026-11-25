@@ -1,0 +1,9 @@
+# Never commit local databases, uploads or secrets - a committed .db file would
+# overwrite your live data on every deploy.
+sgi_admissions.db
+sgi_admissions.db-wal
+sgi_admissions.db-shm
+uploads/
+.env
+__pycache__/
+*.pyc
