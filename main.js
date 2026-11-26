@@ -117,6 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initThemeSync();
   try { initLogoAnimations(); } catch (err) { console.warn('Logo animations skipped:', err); document.getElementById('logoPreloader')?.classList.add('is-done'); document.documentElement.classList.remove('is-preloading'); }
   initImageFallbacks();
+  fixPanoramicImage();
   initDynamicAcademicYear();
   initRouter();
   initMobileNavigation();
@@ -133,11 +134,27 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ========================================================
+   PANORAMIC VIEW IMAGE FIX
+   The original image was deleted, so we replace it with the
+   new campus photo. The CSS wrapper keeps the same dimensions.
+   ======================================================== */
+function fixPanoramicImage() {
+  const img = document.querySelector(
+    'img[alt="Panoramic aerial view of Sukhjinder Group of Institutes campus buildings"]'
+  );
+  if (!img) return;
+
+  img.src = 'assets/images/campus-hero2.jpg';
+  img.loading = 'eager';
+  img.decoding = 'async';
+  img.classList.add('panoramic-view-img');
+  if (!img.classList.contains('about-showcase-photo')) {
+    img.classList.add('about-showcase-photo');
+  }
+}
+
+/* ========================================================
    0. SYSTEM-SYNCED LIGHT / DARK THEME
-   CSS does the real work through @media (prefers-color-scheme).
-   This listener mirrors the device setting on <html data-theme>
-   and keeps the browser UI colour (<meta name="theme-color">) in
-   step whenever the user switches their device theme live.
    ======================================================== */
 function initThemeSync() {
   const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
@@ -251,7 +268,6 @@ function initHeroSlideshow() {
 
 /* ========================================================
    3. ABOUT YOUTUBE VIDEO CONTROLLER
-   Pauses the embedded promo video when leaving the About page
    ======================================================== */
 function pauseAboutVideos() {
   document.querySelectorAll('.about-video-embed').forEach((frame) => {
@@ -266,7 +282,6 @@ function pauseAboutVideos() {
 
 /* ========================================================
    ABOUT PHOTO FALLBACKS
-   Tries each path in data-fallback-srcs until an image loads
    ======================================================== */
 function initImageFallbacks() {
   document.querySelectorAll('img[data-fallback-srcs]').forEach((img) => {
@@ -275,7 +290,6 @@ function initImageFallbacks() {
       if (queue.length) img.src = queue.shift();
     };
     img.addEventListener('error', tryNext);
-    // Cover the case where the image already failed before this script ran
     if (img.complete && img.naturalWidth === 0) tryNext();
   });
 }
@@ -782,7 +796,6 @@ function initAllCourseComboboxes() {
    ======================================================== */
 let activeNoticeFilterCategory = 'all';
 
-// Renders a /api/public-content payload (from the database) into the page.
 function applyPublicContent(data) {
   if (!data || typeof data !== 'object') return;
   loadedNotices = data.notices || [];
@@ -800,8 +813,6 @@ function applyPublicContent(data) {
   renderEventsFeed();
 }
 
-// The server embeds the latest database content in the page (<script id="sgi-boot">),
-// so the first paint already shows saved values instead of the hardcoded HTML text.
 function readBootPayload() {
   try {
     const el = document.getElementById('sgi-boot');
@@ -850,8 +861,8 @@ async function initDynamicCMS() {
   const filterChips = document.querySelectorAll('.notice-filter-chip');
 
   const bootPayload = readBootPayload();
-  if (bootPayload) applyPublicContent(bootPayload);   // instant: data already in the page
-  await fetchAndHydratePublicContent();               // then confirm with a fresh no-store fetch
+  if (bootPayload) applyPublicContent(bootPayload);
+  await fetchAndHydratePublicContent();
 
   filterChips.forEach(chip => {
     chip.addEventListener('click', () => {
@@ -918,14 +929,12 @@ function applyDynamicSiteContent(c) {
     });
   });
 
-  // Hero section
   setTextIfPresent('dynHeroPill', c.hero_pill);
   setTextIfPresent('dynHeroTitleHighlight', c.hero_title_highlight);
   setTextIfPresent('dynHeroTitleRest', c.hero_title_rest);
   setTextIfPresent('dynHeroSubheadline', c.hero_subheadline);
   setTextIfPresent('dynHeroSubtitle', c.hero_subtitle);
 
-  // National Highlights Ribbon + About Facts sync
   setTextIfPresent('dynStatYears', c.stat_years);
   setTextIfPresent('dynFactYears', c.stat_years);
   setTextIfPresent('dynStatYearsTitle', c.stat_years_title);
@@ -950,18 +959,15 @@ function applyDynamicSiteContent(c) {
   setTextIfPresent('dynStatAwardsTitle', c.stat_awards_title);
   setTextIfPresent('dynStatAwardsSub', c.stat_awards_sub);
 
-  // Admissions Banner
   if (c.cta_heading) {
     setTextIfPresent('dynCtaHeading', c.cta_heading.replace(/\{session\}/g, currentSessionString));
   }
   setTextIfPresent('dynCtaDesc', c.cta_desc);
 
-  // Placements
   setTextIfPresent('dynPlacementRate', c.placement_rate);
   setTextIfPresent('dynPlacementDesc', c.placement_desc);
   setTextIfPresent('dynPlacementPartners', c.placement_partners_count);
 
-  // Campus Life Card
   setTextIfPresent('dynCampusLifeTitle', c.campus_life_title);
   setTextIfPresent('dynCampusLifeCaption', c.campus_life_caption);
   setTextIfPresent('dynCampusLifeDesc', c.campus_life_desc);
@@ -970,7 +976,6 @@ function applyDynamicSiteContent(c) {
     if (imgEl) imgEl.src = c.campus_life_img;
   }
 
-  // Contact & Footer Info
   if (c.helpline_phone) {
     const cleanDigits = c.helpline_phone.replace(/[^0-9+]/g, '');
     const contactPhone = document.getElementById('dynContactPhone');
@@ -1092,9 +1097,6 @@ function renderNoticesFeed(category) {
 
 /* ========================================================
    10b. EVENTS & ACTIVITIES - SOCIAL-STYLE FEED
-   Posts come from the database (events table) through the same
-   /api/public-content payload, so they render on first paint and
-   refresh live when an admin publishes, edits or deletes a post.
    ======================================================== */
 function formatEventDate(item) {
   const raw = String((item && item.event_date) || '').trim();
@@ -1189,7 +1191,6 @@ function renderEventsFeed() {
   initCustomCursor();
 }
 
-/* ---- Carousel helpers (native scroll-snap = touch swipe; arrows, dots and counter stay in sync) ---- */
 function syncCarouselUI(carousel, index) {
   const count = Number(carousel.dataset.count) || 1;
   index = Math.max(0, Math.min(count - 1, index));
@@ -1215,7 +1216,6 @@ function goToCarouselSlide(carousel, index) {
   syncCarouselUI(carousel, index);
 }
 
-/* ---- Lightbox ---- */
 function updateLightbox() {
   const item = loadedEvents.find((e) => Number(e.id) === Number(lightboxState.eventId));
   if (!item) return;
@@ -1295,7 +1295,6 @@ function initEventsFeed() {
     if (media) openEventLightbox(media.getAttribute('data-event-id'), media, media.getAttribute('data-img-index'));
   });
 
-  // scroll doesn't bubble, so listen in the capture phase to track swipes on any carousel
   let scrollTick = false;
   feed.addEventListener('scroll', (e) => {
     const track = e.target;
@@ -1333,7 +1332,6 @@ function initEventsFeed() {
   if (prev) prev.addEventListener('click', () => stepEventLightbox(-1));
   if (next) next.addEventListener('click', () => stepEventLightbox(1));
 
-  // swipe inside the lightbox
   let touchX = null;
   if (box) {
     box.addEventListener('touchstart', (e) => { touchX = e.touches[0].clientX; }, { passive: true });
@@ -1365,7 +1363,7 @@ function openNoticeModal(noticeId) {
 
   const modal = document.getElementById('noticeModal');
   const badgeEl = document.getElementById('modalNoticeBadge');
-  
+
   badgeEl.textContent = notice.badge || notice.category_label;
   badgeEl.className = `notice-badge ${notice.badge_class || 'badge-scholar'}`;
 
@@ -1828,8 +1826,7 @@ async function handleContactRouting(e) {
 
 
 /* ========================================================
-   LOGO ANIMATIONS (GSAP): preloader glide, idle float,
-   hover tilt + aura, scroll-shrink header
+   LOGO ANIMATIONS (GSAP)
    ======================================================== */
 function initLogoAnimations() {
   const root = document.documentElement;
@@ -1845,7 +1842,6 @@ function initLogoAnimations() {
     root.classList.remove('is-preloading');
   };
 
-  // Header background/shadow state works even without GSAP
   const scrollY = () => window.scrollY || document.documentElement.scrollTop || 0;
   if (!header || typeof gsap === 'undefined') {
     finishPreloader();
@@ -1857,10 +1853,8 @@ function initLogoAnimations() {
     return;
   }
 
-  // The logo that is actually visible (image, or the SGI badge if the image failed)
   const getLogoEl = () => (brandImg && brandImg.style.display !== 'none') ? brandImg : (brandBadge || null);
 
-  // Brand colour -> rgb for the aura (falls back to the SGI amber)
   const accentHex = getComputedStyle(root).getPropertyValue('--accent-primary').trim().replace('#', '');
   const hex = accentHex.length === 3 ? accentHex.split('').map((c) => c + c).join('') : accentHex;
   const n = parseInt(hex, 16);
@@ -1869,7 +1863,6 @@ function initLogoAnimations() {
   const GLOW_HIGH = `drop-shadow(0 0 8px rgba(${rgb},0.50)) drop-shadow(0 0 16px rgba(${rgb},0.24))`;
   const GLOW_HOVER = `drop-shadow(0 0 10px rgba(${rgb},0.90)) drop-shadow(0 0 26px rgba(${rgb},0.55))`;
 
-  /* ---------- Scroll-shrink (logo + sticky header) ---------- */
   let shrunk = false;
   let baseSize = null;
   const measureBase = () => {
@@ -1882,7 +1875,7 @@ function initLogoAnimations() {
   };
   const applyScrollState = (instant) => {
     const y = scrollY();
-    const want = shrunk ? y > 20 : y > 60; // hysteresis avoids flicker near the threshold
+    const want = shrunk ? y > 20 : y > 60;
     if (want === shrunk && !instant) return;
     shrunk = want;
     header.classList.toggle('is-scrolled', shrunk);
@@ -1896,7 +1889,6 @@ function initLogoAnimations() {
   window.addEventListener('scroll', () => applyScrollState(false), { passive: true });
   applyScrollState(true);
 
-  /* ---------- Hover: 3D tilt + aura + rotate/scale ---------- */
   let glowTween = null;
   let hoverBound = false;
   const initHover = (el) => {
@@ -1931,7 +1923,6 @@ function initLogoAnimations() {
     });
   };
 
-  /* ---------- Idle float + breathing glow ---------- */
   let idleStarted = false;
   const startIdle = () => {
     const el = getLogoEl();
@@ -1942,7 +1933,6 @@ function initLogoAnimations() {
     initHover(el);
   };
 
-  /* ---------- Preloader: centre -> navbar glide ---------- */
   const headerParts = ['.site-header .brand-titles', '.site-header .nav-links', '.site-header .nav-cta']
     .map((s) => document.querySelector(s)).filter(Boolean);
   let revealed = false;
@@ -1971,7 +1961,6 @@ function initLogoAnimations() {
     gsap.set(pLogo, { opacity: 0, scale: 0.55, transformOrigin: '50% 50%' });
     gsap.set('.preloader-aura', { opacity: 0, scale: 0.6 });
 
-    // Hard failsafe so the page can never stay hidden
     const failsafe = setTimeout(() => {
       gsap.killTweensOf([pLogo, '.preloader-aura', '.preloader-bg', ...headerParts]);
       gsap.set(headerParts, { clearProps: 'opacity,transform' });
@@ -1992,7 +1981,7 @@ function initLogoAnimations() {
       fly.to(pLogo, { x: dx, y: dy, scale: s, borderRadius: (6 / s) + 'px', duration: 1.05, ease: 'power3.inOut' }, 0)
          .to('.preloader-aura', { x: dx, y: dy, scale: 0.35, opacity: 0, duration: 1.05, ease: 'power3.inOut' }, 0)
          .to('.preloader-bg', { opacity: 0, duration: 0.8, ease: 'power2.inOut' }, 0.3)
-         .set(logoEl, { opacity: 1 }, 1.03) // hand-off: the real navbar logo takes over where the clone lands
+         .set(logoEl, { opacity: 1 }, 1.03)
          .to(headerParts, { opacity: 1, y: 0, duration: 0.6, stagger: 0.08, ease: 'power2.out', clearProps: 'opacity,transform' }, 0.55);
     };
 
@@ -2000,17 +1989,16 @@ function initLogoAnimations() {
       .to('.preloader-aura', { opacity: 1, scale: 1, duration: 1.1 }, 0)
       .to(pLogo, { opacity: 1, scale: 1, duration: 0.9, ease: 'back.out(1.6)' }, 0.1)
       .to('.preloader-aura', { scale: 1.12, duration: 0.5, yoyo: true, repeat: 1, ease: 'sine.inOut' }, 1.0)
-      .to({}, { duration: 0.15 }); // brief hold before the glide
+      .to({}, { duration: 0.15 });
   };
 
-  // Wait (max 2.5s) for the navbar logo so the glide targets its real size/position
   let started = false;
   const go = () => { if (started) return; started = true; runPreloader(); };
   if (!brandImg || brandImg.complete) {
     go();
   } else {
     brandImg.addEventListener('load', go, { once: true });
-    brandImg.addEventListener('error', go, { once: true }); // inline onerror (badge swap) has already run
+    brandImg.addEventListener('error', go, { once: true });
     setTimeout(go, 2500);
   }
 }
