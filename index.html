@@ -55,6 +55,7 @@
         <a href="#placements" class="nav-item route-link" data-route="placements">Placements</a>
         <a href="#campus" class="nav-item route-link" data-route="campus">Campus</a>
         <a href="#contact" class="nav-item route-link" data-route="contact">Contact Desk</a>
+        <a href="#events" class="nav-item route-link" data-route="events">Events &amp; Activities</a>
       </nav>
 
       <div class="nav-cta">
@@ -104,6 +105,10 @@
         </a>
         <a href="#contact" class="mobile-nav-item route-link" data-route="contact">
           <span>Inquiry &amp; Contact Desk</span>
+          <span class="m-arrow">&rarr;</span>
+        </a>
+        <a href="#events" class="mobile-nav-item route-link" data-route="events">
+          <span>Events &amp; Activities</span>
           <span class="m-arrow">&rarr;</span>
         </a>
       </nav>
@@ -171,23 +176,6 @@
           </div>
         </div>
       </div>
-
-      <!-- ==================== EVENTS & ACTIVITIES (social-style feed) ==================== -->
-      <section class="events-section" id="eventsSection" aria-labelledby="eventsHeading">
-        <div class="section-container">
-          <div class="section-header">
-            <span class="section-eyebrow">Campus Feed</span>
-            <h2 class="section-heading" id="eventsHeading">Events &amp; Activities</h2>
-            <p class="events-subtitle">Moments, celebrations and happenings from across SGI Gurdaspur &mdash; fresh from the campus.</p>
-          </div>
-          <div class="events-feed" id="eventsFeed" aria-live="polite">
-            <div class="events-empty">No events have been posted yet. Check back soon!</div>
-          </div>
-          <div class="events-more-wrap" id="eventsMoreWrap" style="display:none;">
-            <button type="button" class="btn btn-secondary" id="eventsMoreBtn">Show more posts</button>
-          </div>
-        </div>
-      </section>
 
       <!-- National-Level Highlights & Legacy Banner -->
       <section class="national-highlights-ribbon">
@@ -1238,6 +1226,25 @@
       </div>
     </section>
 
+
+    <!-- ==================== 7. EVENTS & ACTIVITIES VIEW (social-style feed) ==================== -->
+    <section class="page-view events-view" id="view-events">
+      <div class="page-header">
+        <span class="section-eyebrow">Campus Feed</span>
+        <h1 class="page-title">Events &amp; Activities</h1>
+        <p class="page-subtitle">Moments, celebrations and happenings from across SGI Gurdaspur &mdash; fresh from the campus.</p>
+      </div>
+
+      <div class="section-container events-container">
+        <div class="events-feed" id="eventsFeed" aria-live="polite">
+          <div class="events-empty">No events have been posted yet. Check back soon!</div>
+        </div>
+        <div class="events-more-wrap" id="eventsMoreWrap" style="display:none;">
+          <button type="button" class="btn btn-secondary" id="eventsMoreBtn">Show more posts</button>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- Interactive Quick Application Modal -->
@@ -1434,7 +1441,10 @@
   <!-- Events photo viewer -->
   <div class="event-lightbox" id="eventLightbox" role="dialog" aria-modal="true" aria-label="Event photo viewer" aria-hidden="true">
     <button type="button" class="event-lightbox-close" id="eventLightboxClose" aria-label="Close photo">&times;</button>
+    <button type="button" class="event-nav prev event-lightbox-nav" id="eventLightboxPrev" aria-label="Previous photo">&#8249;</button>
+    <button type="button" class="event-nav next event-lightbox-nav" id="eventLightboxNext" aria-label="Next photo">&#8250;</button>
     <img id="eventLightboxImg" src="" alt="">
+    <span class="event-counter event-lightbox-counter" id="eventLightboxCounter"></span>
     <p class="event-lightbox-caption" id="eventLightboxCaption"></p>
   </div>
 
