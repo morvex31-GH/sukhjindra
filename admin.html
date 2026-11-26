@@ -715,8 +715,22 @@
     .event-admin-date { font-size: 0.76rem; color: var(--text-muted); font-weight: 600; }
     .event-admin-caption { font-size: 0.84rem; line-height: 1.5; color: var(--text); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; overflow-wrap: anywhere; }
     .event-admin-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: auto; padding-top: 0.4rem; }
-    .event-preview-wrap { margin-top: 0.7rem; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--bg-deep); display: flex; justify-content: center; }
-    .event-preview-wrap img { max-width: 100%; max-height: 260px; object-fit: contain; display: block; }
+    /* Multi-photo drag & drop uploader */
+    .event-dropzone { border: 2px dashed rgba(var(--accent-rgb), 0.55); background: rgba(var(--surface-rgb), 0.65); border-radius: 12px; padding: 1.6rem 1rem; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s, transform 0.2s; }
+    .event-dropzone:hover, .event-dropzone:focus-visible { border-color: var(--accent); outline: none; }
+    .event-dropzone.is-dragover { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.16); transform: scale(1.01); }
+    .event-dropzone-icon { font-size: 2rem; line-height: 1; margin-bottom: 0.4rem; }
+    .event-dropzone-title { font-weight: 800; font-size: 0.95rem; color: var(--text); }
+    .event-dropzone-sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .event-thumbs-head { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; margin-top: 0.8rem; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); }
+    .event-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 0.6rem; margin-top: 0.6rem; }
+    .event-thumb { position: relative; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--bg-deep); }
+    .event-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .event-thumb-remove { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; line-height: 1; padding: 0 0 2px; background: rgba(var(--scrim-deep-rgb), 0.85); color: var(--white); }
+    .event-thumb-remove:hover { background: var(--logout-bg); }
+    .event-thumb-tag { position: absolute; left: 4px; bottom: 4px; font-size: 0.62rem; font-weight: 800; padding: 2px 7px; border-radius: 20px; background: var(--accent); color: var(--btn-text); text-transform: uppercase; letter-spacing: 0.4px; }
+    .event-thumb.is-busy::after { content: ''; position: absolute; inset: 0; background: rgba(var(--scrim-deep-rgb), 0.55); }
+    .event-count-badge { position: absolute; top: 8px; right: 8px; background: rgba(var(--scrim-deep-rgb), 0.78); color: var(--white); font-size: 0.72rem; font-weight: 800; padding: 3px 9px; border-radius: 20px; }
 
     /* Toast Notification */
     .admin-toast {
@@ -807,9 +821,6 @@
     </div>
 
     <div class="action-group-right">
-      <button class="btn-action btn-outline" onclick="openMyProfileModal()">
-        🖼️ My Profile Photo
-      </button>
       <button class="btn-action btn-manage-staff" id="btnManageStaff" style="display:none;" onclick="openStaffModal()">
         👥 Manage Staff Accounts
       </button>
@@ -1247,13 +1258,21 @@
             <textarea id="eventCaption" rows="4" maxlength="2000" required placeholder="Write a short caption about this event or activity..."></textarea>
           </div>
           <div class="form-group full-span">
-            <label for="eventImageFile" id="eventImageLabel">Event Photo (JPG, PNG, WebP or GIF, max 8 MB) *</label>
-            <div class="pdf-dropzone">
-              <input type="file" id="eventImageFile" accept="image/jpeg,image/png,image/webp,image/gif" onchange="previewEventImage(this)">
-              <div class="event-preview-wrap" id="eventPreviewWrap" style="display:none;">
-                <img id="eventPreviewImg" alt="Selected photo preview">
-              </div>
+            <label id="eventImageLabel">Event Photos (up to 20 • JPG, PNG, WebP or GIF)</label>
+            <div class="event-dropzone" id="eventDropzone" role="button" tabindex="0" aria-label="Drop photos here or click to choose files"
+                 onclick="document.getElementById('eventImageFile').click()"
+                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('eventImageFile').click();}"
+                 ondragenter="eventDragOver(event)" ondragover="eventDragOver(event)" ondragleave="eventDragLeave(event)" ondrop="eventDrop(event)">
+              <div class="event-dropzone-icon" aria-hidden="true">📸</div>
+              <div class="event-dropzone-title">Drag &amp; drop photos here</div>
+              <div class="event-dropzone-sub">or click to browse • select up to 20 images at once</div>
+              <input type="file" id="eventImageFile" accept="image/*" multiple hidden onchange="handleEventFilePick(this)">
             </div>
+            <div class="event-thumbs-head" id="eventThumbsHead" style="display:none;">
+              <span id="eventThumbsCount"></span>
+              <button type="button" class="btn-act btn-danger-sm" onclick="clearAllEventItems()">Remove all</button>
+            </div>
+            <div class="event-thumbs" id="eventThumbs"></div>
           </div>
         </div>
 
@@ -2049,7 +2068,6 @@
        ======================================================== */
     const EVENT_MAX_BYTES = 8 * 1024 * 1024;
     const EVENT_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    let eventPreviewObjectUrl = '';
 
     function formatEventDateLabel(raw) {
       const text = String(raw || '').trim();
@@ -2092,6 +2110,7 @@
           <article class="event-admin-card ${ev.is_active ? '' : 'is-hidden'}">
             <div class="event-admin-thumb">
               <img src="${escapeHtml(ev.image_url)}" alt="" loading="lazy" onerror="this.parentElement.classList.add('is-broken')">
+              ${(ev.images && ev.images.length > 1) ? `<span class="event-count-badge">🖼️ ${ev.images.length}</span>` : ''}
             </div>
             <div class="event-admin-body">
               <div class="event-admin-top">
@@ -2111,37 +2130,8 @@
       }).join('');
     }
 
-    function clearEventPreview() {
-      if (eventPreviewObjectUrl) {
-        URL.revokeObjectURL(eventPreviewObjectUrl);
-        eventPreviewObjectUrl = '';
-      }
-      const wrap = document.getElementById('eventPreviewWrap');
-      const img = document.getElementById('eventPreviewImg');
-      if (img) img.removeAttribute('src');
-      if (wrap) wrap.style.display = 'none';
-    }
-
-    function previewEventImage(input) {
-      const file = input.files && input.files[0];
-      if (!file) { clearEventPreview(); return; }
-      if (!EVENT_ALLOWED_TYPES.includes(file.type)) {
-        alert('Please choose a JPG, PNG, WebP or GIF photo.');
-        input.value = '';
-        clearEventPreview();
-        return;
-      }
-      if (file.size > EVENT_MAX_BYTES) {
-        alert('This photo is larger than 8 MB. Please choose a smaller image.');
-        input.value = '';
-        clearEventPreview();
-        return;
-      }
-      clearEventPreview();
-      eventPreviewObjectUrl = URL.createObjectURL(file);
-      document.getElementById('eventPreviewImg').src = eventPreviewObjectUrl;
-      document.getElementById('eventPreviewWrap').style.display = 'flex';
-    }
+    const EVENT_MAX_IMAGES = 20;
+    let eventItems = [];   // { kind: 'existing', url } | { kind: 'new', file, preview }
 
     function todayIsoDate() {
       const d = new Date();
@@ -2149,16 +2139,126 @@
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     }
 
+    function releaseEventItems() {
+      eventItems.forEach(it => { if (it.kind === 'new' && it.preview) URL.revokeObjectURL(it.preview); });
+      eventItems = [];
+    }
+
+    function renderEventThumbs() {
+      const grid = document.getElementById('eventThumbs');
+      const head = document.getElementById('eventThumbsHead');
+      const count = document.getElementById('eventThumbsCount');
+      head.style.display = eventItems.length ? 'flex' : 'none';
+      count.textContent = `${eventItems.length} / ${EVENT_MAX_IMAGES} photos`;
+      grid.innerHTML = eventItems.map((it, i) => `
+        <div class="event-thumb ${it.busy ? 'is-busy' : ''}">
+          <img src="${escapeHtml(it.kind === 'new' ? it.preview : it.url)}" alt="Photo ${i + 1}">
+          ${i === 0 ? '<span class="event-thumb-tag">Cover</span>' : ''}
+          <button type="button" class="event-thumb-remove" title="Remove this photo" aria-label="Remove photo ${i + 1}" onclick="removeEventItem(${i})">&times;</button>
+        </div>
+      `).join('');
+    }
+
+    function removeEventItem(index) {
+      const it = eventItems[index];
+      if (!it) return;
+      if (it.kind === 'new' && it.preview) URL.revokeObjectURL(it.preview);
+      eventItems.splice(index, 1);
+      renderEventThumbs();
+    }
+
+    function clearAllEventItems() {
+      releaseEventItems();
+      renderEventThumbs();
+    }
+
+    function loadImageSource(file) {
+      if (typeof createImageBitmap === 'function') {
+        return createImageBitmap(file).then(bmp => ({ src: bmp, w: bmp.width, h: bmp.height, close: () => bmp.close && bmp.close() }));
+      }
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => resolve({ src: img, w: img.naturalWidth, h: img.naturalHeight, close: () => URL.revokeObjectURL(url) });
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('decode failed')); };
+        img.src = url;
+      });
+    }
+
+    // Shrinks big phone photos (max 1920px, JPEG) so 20 photos upload quickly; also converts formats the server doesn't accept (e.g. HEIC on Safari).
+    async function prepareEventImage(file) {
+      const supported = EVENT_ALLOWED_TYPES.includes(file.type);
+      if (file.type === 'image/gif') return file.size <= EVENT_MAX_BYTES ? file : null;
+      if (supported && file.size <= 1.5 * 1024 * 1024) return file;
+      try {
+        const img = await loadImageSource(file);
+        const scale = Math.min(1, 1920 / Math.max(img.w, img.h));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.w * scale));
+        canvas.height = Math.max(1, Math.round(img.h * scale));
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img.src, 0, 0, canvas.width, canvas.height);
+        img.close();
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.86));
+        if (!blob) throw new Error('encode failed');
+        if (supported && blob.size >= file.size && file.size <= EVENT_MAX_BYTES) return file;
+        if (blob.size > EVENT_MAX_BYTES) return null;
+        return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+      } catch (_) {
+        return (supported && file.size <= EVENT_MAX_BYTES) ? file : null;
+      }
+    }
+
+    async function addEventFiles(fileList) {
+      const incoming = Array.from(fileList || []).filter(f => f.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(f.name));
+      if (!incoming.length) { alert('Please choose image files (JPG, PNG, WebP or GIF).'); return; }
+
+      const room = EVENT_MAX_IMAGES - eventItems.length;
+      const accepted = incoming.slice(0, Math.max(0, room));
+      let skipped = incoming.length - accepted.length;
+      if (room <= 0) { alert(`A post can have up to ${EVENT_MAX_IMAGES} photos.`); return; }
+
+      for (const file of accepted) {
+        const ready = await prepareEventImage(file);
+        if (!ready) { skipped++; continue; }
+        if (eventItems.length >= EVENT_MAX_IMAGES) { skipped++; continue; }
+        eventItems.push({ kind: 'new', file: ready, preview: URL.createObjectURL(ready) });
+        renderEventThumbs();
+      }
+      if (skipped > 0) alert(`${skipped} photo(s) were skipped (limit is ${EVENT_MAX_IMAGES} photos, 8 MB each, JPG/PNG/WebP/GIF).`);
+    }
+
+    function handleEventFilePick(input) {
+      const files = Array.from(input.files || []);
+      input.value = '';
+      addEventFiles(files);
+    }
+
+    function eventDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      document.getElementById('eventDropzone').classList.add('is-dragover');
+    }
+    function eventDragLeave(e) {
+      e.preventDefault();
+      document.getElementById('eventDropzone').classList.remove('is-dragover');
+    }
+    function eventDrop(e) {
+      e.preventDefault();
+      document.getElementById('eventDropzone').classList.remove('is-dragover');
+      addEventFiles(e.dataTransfer && e.dataTransfer.files);
+    }
+
     function openEventEditor(eventId = null) {
       document.getElementById('eventEditorForm').reset();
       document.getElementById('editEventId').value = '';
-      document.getElementById('eventImageFile').value = '';
-      clearEventPreview();
+      releaseEventItems();
       document.getElementById('eventDate').value = todayIsoDate();
       document.getElementById('eventIsActive').checked = true;
       document.getElementById('eventModalHeading').textContent = 'New Event Post';
       document.getElementById('btnSaveEvent').textContent = 'Publish Post →';
-      document.getElementById('eventImageLabel').textContent = 'Event Photo (JPG, PNG, WebP or GIF, max 8 MB) *';
 
       if (eventId) {
         const ev = allEvents.find(item => Number(item.id) === Number(eventId));
@@ -2170,27 +2270,27 @@
         document.getElementById('eventDate').value = ev.event_date || todayIsoDate();
         document.getElementById('eventCaption').value = ev.caption || '';
         document.getElementById('eventIsActive').checked = !!ev.is_active;
-        document.getElementById('eventImageLabel').textContent = 'Replace Photo (optional — leave empty to keep the current photo)';
-        document.getElementById('eventPreviewImg').src = ev.image_url;
-        document.getElementById('eventPreviewWrap').style.display = 'flex';
+        const imgs = (ev.images && ev.images.length) ? ev.images : [ev.image_url];
+        eventItems = imgs.filter(Boolean).map(url => ({ kind: 'existing', url }));
       }
 
+      renderEventThumbs();
       document.getElementById('eventEditorModal').classList.add('open');
     }
 
     function closeEventEditor() {
       document.getElementById('eventEditorModal').classList.remove('open');
-      clearEventPreview();
+      releaseEventItems();
+      renderEventThumbs();
     }
 
     async function handleSaveEvent(e) {
       e.preventDefault();
       const eventId = document.getElementById('editEventId').value;
-      const selectedFile = document.getElementById('eventImageFile').files[0];
       const caption = document.getElementById('eventCaption').value.trim();
 
-      if (!eventId && !selectedFile) {
-        alert('Please choose a photo for this post.');
+      if (eventItems.length === 0) {
+        alert('Please add at least one photo for this post.');
         return;
       }
       if (!caption) {
@@ -2203,7 +2303,10 @@
       formData.append('event_date', document.getElementById('eventDate').value);
       formData.append('caption', caption);
       formData.append('is_active', document.getElementById('eventIsActive').checked ? '1' : '0');
-      if (selectedFile) formData.append('image_file', selectedFile);
+      eventItems.filter(it => it.kind === 'new').forEach(it => formData.append('image_files', it.file, it.file.name));
+      if (eventId) {
+        formData.append('keep_images', JSON.stringify(eventItems.filter(it => it.kind === 'existing').map(it => it.url)));
+      }
 
       const saveBtn = document.getElementById('btnSaveEvent');
       const idleLabel = saveBtn.textContent;
