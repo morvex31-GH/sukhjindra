@@ -929,3 +929,19 @@ html.is-preloading, html.is-preloading body { overflow: hidden; }
   .events-feed { gap: 1.1rem; }
   .events-view .section-container { padding: 0 1.1rem; }
 }
+/* ========================================================
+   PANORAMIC VIEW IMAGE FIX
+   Keeps the original wide banner dimensions.
+   ======================================================== */
+.photo-wrapper-wide .about-showcase-photo,
+img.panoramic-view-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  display: block;
+}
+
+.photo-wrapper-wide {
+  overflow: hidden;
+}
