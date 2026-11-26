@@ -8,6 +8,10 @@ let loadedNotices = [];
 let loadedPrograms = [];
 let loadedSiteContent = {};
 let loadedStaffProfiles = [];
+let loadedEvents = [];
+const EVENTS_PAGE_SIZE = 6;
+let eventsVisibleCount = EVENTS_PAGE_SIZE;
+let lastLightboxOpener = null;
 let currentActiveNotice = null;
 let currentSessionString = '2026–27';
 let currentCourseFilter = 'all';
@@ -109,6 +113,7 @@ function highlightMatch(text, query) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  initThemeSync();
   try { initLogoAnimations(); } catch (err) { console.warn('Logo animations skipped:', err); document.getElementById('logoPreloader')?.classList.add('is-done'); document.documentElement.classList.remove('is-preloading'); }
   initImageFallbacks();
   initDynamicAcademicYear();
@@ -120,10 +125,33 @@ document.addEventListener('DOMContentLoaded', () => {
   initCourseFiltering();
   initAllCourseComboboxes();
   initLeadForm();
+  initEventsFeed();
   initCustomCursor();
   initDynamicCMS();
   initLiveSyncListeners();
 });
+
+/* ========================================================
+   0. SYSTEM-SYNCED LIGHT / DARK THEME
+   CSS does the real work through @media (prefers-color-scheme).
+   This listener mirrors the device setting on <html data-theme>
+   and keeps the browser UI colour (<meta name="theme-color">) in
+   step whenever the user switches their device theme live.
+   ======================================================== */
+function initThemeSync() {
+  const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  const root = document.documentElement;
+  const apply = () => {
+    const theme = (mq && mq.matches) ? 'dark' : 'light';
+    root.setAttribute('data-theme', theme);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#0B2545' : '#F3F6FB');
+  };
+  apply();
+  if (!mq) return;
+  if (typeof mq.addEventListener === 'function') mq.addEventListener('change', apply);
+  else if (typeof mq.addListener === 'function') mq.addListener(apply);
+}
 
 /* ========================================================
    1. CLIENT-SIDE ROUTER (SPA PAGE NAVIGATION & VIDEO AUTOPLAY)
@@ -414,12 +442,12 @@ function initCustomCursor() {
     cursor.dataset.boundMouse = '1';
   }
 
-  document.querySelectorAll('a, button, .course-pill, .recruiter-box, .emblem-card, .notice-item-interactive, .media-card, .preview-stream-card, .public-staff-card').forEach((elem) => {
+  document.querySelectorAll('a, button, .course-pill, .recruiter-box, .emblem-card, .notice-item-interactive, .media-card, .preview-stream-card, .public-staff-card, .event-card').forEach((elem) => {
     if (elem.dataset.cursorBound) return;
     elem.dataset.cursorBound = '1';
     elem.addEventListener('mouseenter', () => {
       cursor.style.transform = 'translate(-50%, -50%) scale(1.6)';
-      cursor.style.background = 'rgba(244, 180, 0, 0.25)';
+      cursor.style.background = 'rgba(var(--accent-rgb), 0.25)';
     });
     elem.addEventListener('mouseleave', () => {
       cursor.style.transform = 'translate(-50%, -50%) scale(1)';
@@ -760,6 +788,7 @@ function applyPublicContent(data) {
   loadedPrograms = data.programs || [];
   loadedSiteContent = data.site_content || {};
   loadedStaffProfiles = data.staff_profiles || [];
+  if (Array.isArray(data.events)) loadedEvents = data.events;
 
   applyDynamicSiteContent(loadedSiteContent);
   if (loadedPrograms.length > 0) {
@@ -767,6 +796,7 @@ function applyPublicContent(data) {
   }
   renderNoticesFeed(activeNoticeFilterCategory);
   renderPublicStaffProfiles(loadedStaffProfiles);
+  renderEventsFeed();
 }
 
 // The server embeds the latest database content in the page (<script id="sgi-boot">),
@@ -942,17 +972,6 @@ function applyDynamicSiteContent(c) {
   // Contact & Footer Info
   if (c.helpline_phone) {
     const cleanDigits = c.helpline_phone.replace(/[^0-9+]/g, '');
-    const shortDisplay = c.helpline_phone.replace(/^\+91\s*/, '');
-    const headerCall = document.getElementById('dynHeaderCall');
-    if (headerCall) {
-      headerCall.href = `tel:${cleanDigits}`;
-      headerCall.textContent = `Call: ${shortDisplay}`;
-    }
-    const mobileCall = document.getElementById('dynMobileCall');
-    if (mobileCall) {
-      mobileCall.href = `tel:${cleanDigits}`;
-      mobileCall.textContent = `📞 Helpline: ${shortDisplay}`;
-    }
     const contactPhone = document.getElementById('dynContactPhone');
     if (contactPhone) {
       contactPhone.href = `tel:${cleanDigits}`;
@@ -1068,6 +1087,137 @@ function renderNoticesFeed(category) {
   }).join('');
 
   initCustomCursor();
+}
+
+/* ========================================================
+   10b. EVENTS & ACTIVITIES - SOCIAL-STYLE FEED
+   Posts come from the database (events table) through the same
+   /api/public-content payload, so they render on first paint and
+   refresh live when an admin publishes, edits or deletes a post.
+   ======================================================== */
+function formatEventDate(item) {
+  const raw = String((item && item.event_date) || '').trim();
+  let d = null;
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    d = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  } else if (item && item.created_at) {
+    const t = new Date(String(item.created_at).replace(' ', 'T') + 'Z');
+    if (!isNaN(t.getTime())) d = t;
+  }
+  if (!d || isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function isLongEventCaption(text) {
+  const t = String(text || '');
+  return t.length > 140 || (t.match(/\n/g) || []).length >= 3;
+}
+
+function renderEventsFeed() {
+  const feed = document.getElementById('eventsFeed');
+  if (!feed) return;
+  const moreWrap = document.getElementById('eventsMoreWrap');
+
+  if (!loadedEvents.length) {
+    feed.innerHTML = '<div class="events-empty">No events have been posted yet. Check back soon!</div>';
+    if (moreWrap) moreWrap.style.display = 'none';
+    return;
+  }
+
+  const visible = loadedEvents.slice(0, eventsVisibleCount);
+  feed.innerHTML = visible.map((item) => {
+    const title = (item.title || '').trim() || 'SGI Gurdaspur';
+    const dateLabel = formatEventDate(item);
+    const caption = String(item.caption || '').trim();
+    const long = isLongEventCaption(caption);
+    const altText = escapeHTML(title + (caption ? ' - ' + caption.slice(0, 90) : ''));
+
+    return `
+      <article class="event-card" data-event-id="${Number(item.id)}">
+        <header class="event-card-head">
+          <span class="event-avatar" aria-hidden="true">SGI</span>
+          <div class="event-head-meta">
+            <strong>${escapeHTML(title)}</strong>
+            ${dateLabel ? `<time>${escapeHTML(dateLabel)}</time>` : ''}
+          </div>
+        </header>
+        <button type="button" class="event-media" data-event-id="${Number(item.id)}" aria-label="View photo: ${escapeHTML(title)}">
+          <img src="${escapeHTML(item.image_url)}" alt="${altText}" loading="lazy" decoding="async" onerror="this.parentElement.classList.add('is-broken')">
+        </button>
+        <div class="event-body">
+          ${caption ? `<p class="event-caption${long ? ' is-clamped' : ''}">${escapeHTML(caption)}</p>` : ''}
+          ${caption && long ? '<button type="button" class="event-more-btn">more</button>' : ''}
+          ${dateLabel ? `<span class="event-date-chip">📅 ${escapeHTML(dateLabel)}</span>` : ''}
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  if (moreWrap) moreWrap.style.display = loadedEvents.length > eventsVisibleCount ? 'flex' : 'none';
+  initCustomCursor();
+}
+
+function openEventLightbox(eventId, openerEl) {
+  const item = loadedEvents.find((e) => Number(e.id) === Number(eventId));
+  const box = document.getElementById('eventLightbox');
+  if (!item || !box) return;
+  const img = document.getElementById('eventLightboxImg');
+  const cap = document.getElementById('eventLightboxCaption');
+  img.src = item.image_url;
+  img.alt = (item.title || 'SGI Gurdaspur event photo');
+  cap.textContent = [item.title, item.caption].filter(Boolean).join(' - ');
+  lastLightboxOpener = openerEl || null;
+  box.classList.add('open');
+  box.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  const closeBtn = document.getElementById('eventLightboxClose');
+  if (closeBtn) closeBtn.focus();
+}
+
+function closeEventLightbox() {
+  const box = document.getElementById('eventLightbox');
+  if (!box || !box.classList.contains('open')) return;
+  box.classList.remove('open');
+  box.setAttribute('aria-hidden', 'true');
+  const img = document.getElementById('eventLightboxImg');
+  if (img) img.removeAttribute('src');
+  document.body.style.overflow = '';
+  if (lastLightboxOpener && typeof lastLightboxOpener.focus === 'function') lastLightboxOpener.focus();
+  lastLightboxOpener = null;
+}
+
+function initEventsFeed() {
+  const feed = document.getElementById('eventsFeed');
+  if (!feed) return;
+
+  feed.addEventListener('click', (e) => {
+    const moreBtn = e.target.closest('.event-more-btn');
+    if (moreBtn) {
+      const caption = moreBtn.closest('.event-body').querySelector('.event-caption');
+      if (caption) {
+        const clamped = caption.classList.toggle('is-clamped');
+        moreBtn.textContent = clamped ? 'more' : 'less';
+      }
+      return;
+    }
+    const media = e.target.closest('.event-media');
+    if (media) openEventLightbox(media.getAttribute('data-event-id'), media);
+  });
+
+  const showMore = document.getElementById('eventsMoreBtn');
+  if (showMore) {
+    showMore.addEventListener('click', () => {
+      eventsVisibleCount += EVENTS_PAGE_SIZE;
+      renderEventsFeed();
+    });
+  }
+
+  const box = document.getElementById('eventLightbox');
+  const closeBtn = document.getElementById('eventLightboxClose');
+  if (closeBtn) closeBtn.addEventListener('click', closeEventLightbox);
+  if (box) box.addEventListener('click', (e) => { if (e.target === box) closeEventLightbox(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeEventLightbox(); });
 }
 
 /* ========================================================
@@ -1455,7 +1605,7 @@ function initLeadForm() {
       }
     } catch (err) {
       statusMsg.textContent = 'Application recorded! Admissions Helpline: +91 93160 93494';
-      statusMsg.style.color = 'var(--accent-secondary)';
+      statusMsg.style.color = 'var(--accent-text)';
       console.warn('API Endpoint status:', err);
     }
   });
@@ -1537,7 +1687,7 @@ async function handleContactRouting(e) {
     }
   } catch (err) {
     statusEl.textContent = `✓ Inquiry logged for ${course}. Call +91 93160 93494 for urgent help.`;
-    statusEl.style.color = 'var(--accent-secondary)';
+    statusEl.style.color = 'var(--accent-text)';
     console.warn('Contact form status:', err);
   }
 }

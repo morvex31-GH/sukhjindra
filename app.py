@@ -2,7 +2,7 @@
 SGI Gurdaspur - Enterprise Admissions Portal & Multi-User RBAC CRM
 Isolated Public Routing, Protected Admin Console, PBKDF2 Hashing,
 Dynamic Notices (with PDF Attachments), Degree Programs, Staff Profile Avatars
-& Live Site Content Management.
+Live Site Content Management & the Events & Activities social feed.
 Run: python app.py
 """
 
@@ -26,6 +26,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_NAME = os.path.join(BASE_DIR, "sgi_admissions.db")
 UPLOAD_NOTICES_DIR = os.path.join(BASE_DIR, "uploads", "notices")
 UPLOAD_AVATARS_DIR = os.path.join(BASE_DIR, "uploads", "avatars")
+UPLOAD_EVENTS_DIR = os.path.join(BASE_DIR, "uploads", "events")   # never written to: event photos live in the database
 for _d in (UPLOAD_NOTICES_DIR, UPLOAD_AVATARS_DIR):   # legacy folders only; files now live in the database
     try:
         os.makedirs(_d, exist_ok=True)
@@ -56,6 +57,8 @@ app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024  # 25 MB max upload
 
 EMAIL_REGEX = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 ALLOWED_AVATAR_EXTS = {'.jpg', '.jpeg', '.png', '.webp'}
+EVENT_IMAGE_MIME = {'.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif'}
+MAX_EVENT_IMAGE_BYTES = 8 * 1024 * 1024   # 8 MB per event photo
 
 # -------------------------------------------------------------
 # Default Seed Data for Notices, Programs & Site Content
@@ -189,7 +192,7 @@ else:
                 "ephemeral disk (Render/Heroku/Railway/Vercel...). Set DATABASE_URL.", DB_NAME)
 
 # Tables whose INSERTs should report the new row id (emulates sqlite's cursor.lastrowid on Postgres)
-_AUTOID_TABLES = {"users", "leads", "notices", "programs"}
+_AUTOID_TABLES = {"users", "leads", "notices", "programs", "events"}
 _INSERT_RE = re.compile(r"^\s*INSERT\s+(?:OR\s+IGNORE\s+)?INTO\s+(\w+)", re.IGNORECASE)
 
 
@@ -368,6 +371,10 @@ _SCHEMA_PG = [
     """CREATE TABLE IF NOT EXISTS files (
         name TEXT PRIMARY KEY, kind TEXT NOT NULL, mimetype TEXT DEFAULT '', data BYTEA NOT NULL,
         created_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC'))""",
+    """CREATE TABLE IF NOT EXISTS events (
+        id SERIAL PRIMARY KEY, title TEXT DEFAULT '', caption TEXT DEFAULT '', event_date TEXT DEFAULT '',
+        image_url TEXT NOT NULL, is_active INTEGER DEFAULT 1, created_by TEXT DEFAULT 'Admin',
+        created_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC'))""",
     """CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)""",
 ]
 
@@ -397,6 +404,10 @@ _SCHEMA_SQLITE = [
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)""",
     """CREATE TABLE IF NOT EXISTS files (
         name TEXT PRIMARY KEY, kind TEXT NOT NULL, mimetype TEXT DEFAULT '', data BLOB NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""",
+    """CREATE TABLE IF NOT EXISTS events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT DEFAULT '', caption TEXT DEFAULT '', event_date TEXT DEFAULT '',
+        image_url TEXT NOT NULL, is_active INTEGER DEFAULT 1, created_by TEXT DEFAULT 'Admin',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""",
     """CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)""",
 ]
@@ -596,6 +607,88 @@ def remove_avatar_file(avatar_url):
             pass
 
 
+# ---- Events & Activities (social feed) helpers ----
+EVENT_COLUMNS = "id, title, caption, event_date, image_url, is_active, created_by, created_at"
+
+
+def row_to_event_dict(r):
+    return {
+        "id": r[0],
+        "title": r[1] or "",
+        "caption": r[2] or "",
+        "event_date": r[3] or "",
+        "image_url": r[4] or "",
+        "is_active": bool(r[5]),
+        "created_by": r[6],
+        "created_at": r[7]
+    }
+
+
+def fetch_events(active_only=True, limit=None):
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        sql = f"SELECT {EVENT_COLUMNS} FROM events"
+        if active_only:
+            sql += " WHERE is_active = 1"
+        sql += " ORDER BY event_date DESC, id DESC"
+        if limit:
+            sql += f" LIMIT {int(limit)}"
+        cursor.execute(sql)
+        return [row_to_event_dict(r) for r in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def _sniff_image_ext(data):
+    """Detects the real image type from the file's first bytes (never trusts the filename)."""
+    if data[:3] == b'\xff\xd8\xff':
+        return '.jpg'
+    if data[:8] == b'\x89PNG\r\n\x1a\n':
+        return '.png'
+    if data[:6] in (b'GIF87a', b'GIF89a'):
+        return '.gif'
+    if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+        return '.webp'
+    return None
+
+
+def save_event_image(file_storage):
+    """Validates an Events photo (JPG/PNG/WebP/GIF, max 8 MB) and stores it in the database."""
+    original_name = (file_storage.filename or "").strip()
+    if not original_name:
+        return None
+    data = file_storage.read()
+    if not data:
+        raise ValueError("The uploaded photo is empty.")
+    if len(data) > MAX_EVENT_IMAGE_BYTES:
+        raise ValueError("Photo is too large. Please upload an image under 8 MB.")
+    ext = _sniff_image_ext(data)
+    if not ext:
+        raise ValueError("Only JPG, PNG, WebP or GIF photos are supported.")
+    unique_name = f"event_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}{ext}"
+    store_file(unique_name, "event", EVENT_IMAGE_MIME[ext], data)
+    return f"/uploads/events/{unique_name}"
+
+
+def remove_event_image_file(image_url):
+    """Removes an event photo from the database (no legacy disk copy ever existed)."""
+    if not image_url or not image_url.startswith("/uploads/events/"):
+        return
+    delete_file(os.path.basename(image_url.split("?")[0]))
+
+
+def _clean_event_date(raw):
+    """Accepts YYYY-MM-DD (from <input type=date>); blank means today."""
+    value = (raw or "").strip()
+    if not value:
+        return datetime.now().strftime('%Y-%m-%d')
+    try:
+        return datetime.strptime(value, '%Y-%m-%d').strftime('%Y-%m-%d')
+    except ValueError:
+        raise ValueError("Please choose a valid event date.")
+
+
 def row_to_notice_dict(r):
     return {
         "id": r[0],
@@ -780,6 +873,16 @@ def serve_avatar_image(filename):
     return _serve_stored_file(filename, UPLOAD_AVATARS_DIR, "image/png")
 
 
+@app.route('/uploads/events/<path:filename>')
+def serve_event_image(filename):
+    return _serve_stored_file(filename, UPLOAD_EVENTS_DIR, "image/jpeg")
+
+
+@app.route('/api/events', methods=['GET'])
+def get_live_events():
+    return jsonify({"events": fetch_events(active_only=True, limit=60)})
+
+
 @app.route('/healthz')
 def healthz():
     """Cheap liveness + database check (also handy for an uptime pinger)."""
@@ -944,7 +1047,8 @@ def build_public_payload():
         "notices": notices,
         "programs": programs,
         "site_content": site_content,
-        "staff_profiles": staff_profiles
+        "staff_profiles": staff_profiles,
+        "events": fetch_events(active_only=True, limit=60)
     }
 
 
@@ -961,23 +1065,52 @@ LOGIN_PAGE_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark light">
   <title>SGI Staff Portal | Authentication</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Syne:wght@700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
+      color-scheme: dark;
       --bg: #0B2545;
       --card-bg: rgba(19, 49, 92, 0.96);
       --border: rgba(255, 255, 255, 0.14);
       --accent: #F4B400;
+      --accent-2: #FFC107;
+      --accent-text: #FFC107;
+      --accent-rgb: 244, 180, 0;
+      --btn-text: #0B2545;
       --text: #FFFFFF;
       --text-muted: #CBD5E1;
       --error: #ff6b6b;
+      --error-rgb: 255, 107, 107;
+      --input-bg: rgba(11, 37, 69, 0.75);
+      --page-gradient: radial-gradient(circle at top right, #13315C 0%, #0B2545 65%, #071930 100%);
+      --box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { color-scheme: dark; }
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        color-scheme: light;
+        --bg: #F3F6FB;
+        --card-bg: rgba(255, 255, 255, 0.97);
+        --border: rgba(11, 37, 69, 0.16);
+        --accent-text: #8A5A00;
+        --text: #0B2545;
+        --text-muted: #475569;
+        --error: #b91c1c;
+        --error-rgb: 185, 28, 28;
+        --input-bg: #FFFFFF;
+        --page-gradient: radial-gradient(circle at top right, #FFFFFF 0%, #F3F6FB 65%, #E6ECF5 100%);
+        --box-shadow: 0 20px 50px rgba(15, 23, 42, 0.14);
+      }
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: radial-gradient(circle at top right, #13315C 0%, #0B2545 65%, #071930 100%);
+      background: var(--page-gradient);
       color: var(--text);
       font-family: 'Plus Jakarta Sans', sans-serif;
       min-height: 100vh;
@@ -993,13 +1126,13 @@ LOGIN_PAGE_HTML = """<!DOCTYPE html>
       padding: 2.5rem;
       width: 100%;
       max-width: 440px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+      box-shadow: var(--box-shadow);
       text-align: center;
     }
     .badge-lock {
-      background: rgba(244, 180, 0, 0.15);
+      background: rgba(var(--accent-rgb), 0.15);
       border: 1px solid var(--accent);
-      color: #FFC107;
+      color: var(--accent-text);
       padding: 5px 14px;
       border-radius: 30px;
       font-size: 0.78rem;
@@ -1016,7 +1149,7 @@ LOGIN_PAGE_HTML = """<!DOCTYPE html>
       padding: 0.85rem 1rem;
       border-radius: 10px;
       border: 1px solid var(--border);
-      background: rgba(11, 37, 69, 0.75);
+      background: var(--input-bg);
       color: var(--text);
       font-size: 0.95rem;
       outline: none;
@@ -1025,8 +1158,8 @@ LOGIN_PAGE_HTML = """<!DOCTYPE html>
     input[type="text"]:focus, input[type="password"]:focus { border-color: var(--accent); }
     .btn-login {
       width: 100%;
-      background: linear-gradient(135deg, #F4B400, #FFC107);
-      color: #0B2545;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: var(--btn-text);
       border: none;
       padding: 0.9rem;
       border-radius: 10px;
@@ -1039,7 +1172,7 @@ LOGIN_PAGE_HTML = """<!DOCTYPE html>
     }
     .btn-login:hover { opacity: 0.92; }
     .error-msg {
-      background: rgba(255, 107, 107, 0.14);
+      background: rgba(var(--error-rgb), 0.14);
       border: 1px solid var(--error);
       color: var(--error);
       padding: 0.65rem;
@@ -1055,7 +1188,7 @@ LOGIN_PAGE_HTML = """<!DOCTYPE html>
       text-decoration: none;
       font-size: 0.82rem;
     }
-    .back-link:hover { color: #FFC107; }
+    .back-link:hover { color: var(--accent-text); }
   </style>
 </head>
 <body>
@@ -1547,6 +1680,140 @@ def admin_delete_notice(notice_id):
             remove_notice_pdf_file(row[0])
         cursor.execute("DELETE FROM notices WHERE id = ?", (notice_id,))
         conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"success": True})
+
+
+# -------------------------------------------------------------
+# 6b. Admin Events & Activities CRUD APIs (photo + caption posts, FormData)
+# -------------------------------------------------------------
+def _truthy(value):
+    return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+@app.route('/api/admin/events', methods=['GET'])
+@login_required
+def admin_list_events():
+    return jsonify({"events": fetch_events(active_only=False)})
+
+
+@app.route('/api/admin/events', methods=['POST'])
+@login_required
+def admin_create_event():
+    is_multipart = bool(request.content_type and 'multipart/form-data' in request.content_type)
+    data = request.form if is_multipart else (request.get_json(silent=True) or {})
+
+    title = (data.get('title') or '').strip()[:120]
+    caption = (data.get('caption') or '').strip()[:2000]
+    is_active = 1 if _truthy(data.get('is_active', '1')) else 0
+    created_by = session.get('full_name', 'Admin')
+
+    try:
+        event_date = _clean_event_date(data.get('event_date'))
+    except ValueError as ve:
+        return jsonify({"success": False, "message": str(ve)}), 400
+
+    if not caption:
+        return jsonify({"success": False, "message": "A caption / description is required."}), 400
+
+    uploaded_file = request.files.get('image_file') if is_multipart else None
+    if not uploaded_file or not uploaded_file.filename:
+        return jsonify({"success": False, "message": "Please choose a photo for this post."}), 400
+
+    try:
+        image_url = save_event_image(uploaded_file)
+    except ValueError as ve:
+        return jsonify({"success": False, "message": str(ve)}), 400
+
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO events (title, caption, event_date, image_url, is_active, created_by)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (title, caption, event_date, image_url, is_active, created_by))
+        conn.commit()
+        new_id = cursor.lastrowid
+    except Exception as e:
+        conn.rollback()
+        remove_event_image_file(image_url)
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        conn.close()
+
+    return jsonify({"success": True, "id": new_id, "image_url": image_url}), 201
+
+
+@app.route('/api/admin/events/<int:event_id>', methods=['PUT'])
+@login_required
+def admin_update_event(event_id):
+    is_multipart = bool(request.content_type and 'multipart/form-data' in request.content_type)
+    data = request.form if is_multipart else (request.get_json(silent=True) or {})
+
+    conn = get_db()
+    new_image_url = None
+    old_image_url = ""
+    try:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT {EVENT_COLUMNS} FROM events WHERE id = ?", (event_id,))
+        existing = cursor.fetchone()
+        if not existing:
+            return jsonify({"success": False, "message": "Event post not found."}), 404
+
+        title = (data.get('title') if 'title' in data else existing[1] or '').strip()[:120]
+        caption = (data.get('caption') if 'caption' in data else existing[2] or '').strip()[:2000]
+        if not caption:
+            return jsonify({"success": False, "message": "A caption / description is required."}), 400
+
+        try:
+            event_date = _clean_event_date(data.get('event_date')) if 'event_date' in data else (existing[3] or _clean_event_date(''))
+        except ValueError as ve:
+            return jsonify({"success": False, "message": str(ve)}), 400
+
+        is_active = (1 if _truthy(data.get('is_active')) else 0) if 'is_active' in data else existing[5]
+
+        image_url = existing[4] or ""
+        old_image_url = image_url
+        uploaded_file = request.files.get('image_file') if is_multipart else None
+        if uploaded_file and uploaded_file.filename:
+            try:
+                new_image_url = save_event_image(uploaded_file)
+            except ValueError as ve:
+                return jsonify({"success": False, "message": str(ve)}), 400
+            image_url = new_image_url
+
+        cursor.execute("""
+            UPDATE events SET title = ?, caption = ?, event_date = ?, image_url = ?, is_active = ?
+            WHERE id = ?
+        """, (title, caption, event_date, image_url, is_active, event_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        if new_image_url:
+            remove_event_image_file(new_image_url)
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        conn.close()
+
+    if new_image_url:
+        remove_event_image_file(old_image_url)       # only after the new photo is safely saved
+    return jsonify({"success": True, "image_url": new_image_url or old_image_url})
+
+
+@app.route('/api/admin/events/<int:event_id>', methods=['DELETE'])
+@login_required
+def admin_delete_event(event_id):
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT image_url FROM events WHERE id = ?", (event_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "message": "Event post not found."}), 404
+        cursor.execute("DELETE FROM events WHERE id = ?", (event_id,))
+        conn.commit()
+        remove_event_image_file(row[0])
     finally:
         conn.close()
     return jsonify({"success": True})

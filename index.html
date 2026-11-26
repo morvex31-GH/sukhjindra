@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0B2545">
   <title>SGI Gurdaspur | Sukhjinder Group of Institutes</title>
   
   <!-- Fonts: Syne (Display) & Plus Jakarta Sans (Body) -->
@@ -16,7 +18,7 @@
   <!-- GSAP (GreenSock) for logo animations -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20261124">
+  <link rel="stylesheet" href="styles.css?v=20261126">
 </head>
 <body>
   <!-- Logo Preloader (GSAP): logo scales in at center, then glides into the navbar -->
@@ -56,7 +58,6 @@
       </nav>
 
       <div class="nav-cta">
-        <a href="tel:9316093494" id="dynHeaderCall" class="btn btn-secondary header-call-btn magnetic-btn">Call: 93160 93494</a>
         <button class="btn btn-primary header-apply-btn magnetic-btn" onclick="openModal()">Apply Now</button>
         
         <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Open mobile navigation menu">
@@ -108,9 +109,6 @@
       </nav>
 
       <div class="mobile-nav-bottom">
-        <a href="tel:9316093494" id="dynMobileCall" class="btn btn-secondary btn-block" style="margin-bottom:0.8rem; font-size:0.9rem;">
-          📞 Helpline: 93160 93494
-        </a>
         <button class="btn btn-primary btn-block" onclick="openModal(); closeMobileNav();">
           Apply for <span class="dynamic-session">2026–27</span>
         </button>
@@ -173,6 +171,23 @@
           </div>
         </div>
       </div>
+
+      <!-- ==================== EVENTS & ACTIVITIES (social-style feed) ==================== -->
+      <section class="events-section" id="eventsSection" aria-labelledby="eventsHeading">
+        <div class="section-container">
+          <div class="section-header">
+            <span class="section-eyebrow">Campus Feed</span>
+            <h2 class="section-heading" id="eventsHeading">Events &amp; Activities</h2>
+            <p class="events-subtitle">Moments, celebrations and happenings from across SGI Gurdaspur &mdash; fresh from the campus.</p>
+          </div>
+          <div class="events-feed" id="eventsFeed" aria-live="polite">
+            <div class="events-empty">No events have been posted yet. Check back soon!</div>
+          </div>
+          <div class="events-more-wrap" id="eventsMoreWrap" style="display:none;">
+            <button type="button" class="btn btn-secondary" id="eventsMoreBtn">Show more posts</button>
+          </div>
+        </div>
+      </section>
 
       <!-- National-Level Highlights & Legacy Banner -->
       <section class="national-highlights-ribbon">
@@ -511,7 +526,7 @@
               <div class="card-tag">Verified Outcomes</div>
               <h3 class="bento-big-stat"><span data-cms="placement_rate">94%</span> <span>Placed</span></h3>
               <p class="bento-desc" style="margin-top: 0.75rem;">
-                Backed by <strong style="color: var(--accent-secondary);" data-cms="placement_partners_count">200+</strong> corporate &amp; multi-specialty hospital tie-ups with round-the-year aptitude, coding, and mock interview bootcamps.
+                Backed by <strong style="color: var(--accent-text);" data-cms="placement_partners_count">200+</strong> corporate &amp; multi-specialty hospital tie-ups with round-the-year aptitude, coding, and mock interview bootcamps.
               </p>
             </div>
             <div style="margin-top: 1.4rem;">
@@ -1119,7 +1134,7 @@
 
               <div class="contact-detail-block">
                 <strong>Admissions Helpline:</strong>
-                <p><a href="tel:+919316093494" id="dynContactPhone" style="color:var(--accent-primary); font-weight:700; text-decoration:none;">+91 93160 93494</a></p>
+                <p><a href="tel:+919316093494" id="dynContactPhone" style="color:var(--accent-text); font-weight:700; text-decoration:none;">+91 93160 93494</a></p>
               </div>
 
               <div class="contact-detail-block">
@@ -1330,7 +1345,7 @@
       <div class="footer-col footer-brand-col">
         <h3 style="font-family: var(--font-display); color: var(--text-main); margin-bottom: 0.5rem;">Sukhjinder Group of Institutes</h3>
         <p id="dynFooterAddress" style="color: var(--text-muted); font-size: 0.9rem;">V.P.O. Hayat Nagar, Hardochhani Road, Gurdaspur, Punjab – 143521</p>
-        <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.9rem;">Admissions Helpline: <strong id="dynFooterPhone" style="color: var(--accent-primary);">+91 93160 93494</strong></p>
+        <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.9rem;">Admissions Helpline: <strong id="dynFooterPhone" style="color: var(--accent-text);">+91 93160 93494</strong></p>
         <p style="color: var(--text-muted); font-size: 0.9rem;">Campus Admin: <a href="mailto:admin@sgigurdaspur.org" id="dynFooterEmail" style="color: var(--text-main); text-decoration: none;">admin@sgigurdaspur.org</a></p>
 
         <!-- Official Clickable Social Media Handles -->
@@ -1402,7 +1417,7 @@
           <li><a href="https://www.pci.nic.in/" target="_blank" rel="noopener noreferrer">PCI Statutory Approvals ↗</a></li>
           <li><a href="https://indiannursingcouncil.org/" target="_blank" rel="noopener noreferrer">INC &amp; PNRC Affiliation Orders ↗</a></li>
           <li><a href="#compliance" onclick="event.preventDefault(); downloadProspectusPDF()">Approved Fee Structure &amp; Prospectus</a></li>
-          <li><a href="tel:18001805522" style="color: var(--accent-primary); font-weight: 700;">Anti-Ragging Helpline: 1800-180-5522</a></li>
+          <li><a href="tel:18001805522" style="color: var(--accent-text); font-weight: 700;">Anti-Ragging Helpline: 1800-180-5522</a></li>
           <li><a href="#rti" onclick="event.preventDefault(); alert('RTI Cell: V.P.O. Hayat Nagar, Hardochhani Road, Gurdaspur, Punjab – 143521')">Right to Information (RTI) Cell</a></li>
         </ul>
       </div>
@@ -1416,6 +1431,13 @@
     </div>
   </footer>
 
-  <script src="main.js?v=20261124"></script>
+  <!-- Events photo viewer -->
+  <div class="event-lightbox" id="eventLightbox" role="dialog" aria-modal="true" aria-label="Event photo viewer" aria-hidden="true">
+    <button type="button" class="event-lightbox-close" id="eventLightboxClose" aria-label="Close photo">&times;</button>
+    <img id="eventLightboxImg" src="" alt="">
+    <p class="event-lightbox-caption" id="eventLightboxCaption"></p>
+  </div>
+
+  <script src="main.js?v=20261126"></script>
 </body>
 </html>
