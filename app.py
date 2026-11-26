@@ -11,6 +11,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import sqlite3
 import os
+import secrets
 import csv
 
 import io
@@ -47,7 +48,6 @@ app = Flask(__name__, static_folder=None)
 #   SECRET_KEY              -> stable session-signing key (keeps admins logged in across restarts).
 #   ADMIN_INITIAL_PASSWORD  -> password for the first-ever 'admin' account (only used once).
 #   COOKIE_SECURE=1         -> mark the session cookie HTTPS-only (recommended in production).
-app.secret_key = os.environ.get("SECRET_KEY") or "sgi_super_secret_enterprise_portal_2026_gurdaspur"
 
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -178,6 +178,17 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 if DATABASE_URL.startswith("postgres://"):          # some hosts still hand out the legacy scheme
     DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://"):]
 USE_PG = DATABASE_URL.startswith("postgresql://")
+
+# Session-signing key: never hardcoded. Required (32+ chars) in production; a
+# throwaway random key is generated for local SQLite development only.
+SECRET_KEY = os.environ.get("SECRET_KEY", "").strip()
+if USE_PG or os.environ.get("REQUIRE_PERSISTENT_DB", "").strip() == "1":
+    if len(SECRET_KEY) < 32:
+        raise RuntimeError(
+            "SECRET_KEY must be set to a random value of at least 32 characters. Generate one with: "
+            'python -c "import secrets; print(secrets.token_hex(32))"'
+        )
+app.secret_key = SECRET_KEY or secrets.token_hex(32)
 
 if USE_PG:
     import psycopg2
@@ -474,7 +485,9 @@ def init_db():
             cursor.execute("ALTER TABLE events ADD COLUMN IF NOT EXISTS images_json TEXT DEFAULT '[]'")
 
         def seed_admin():
-            pwd = os.environ.get("ADMIN_INITIAL_PASSWORD", "").strip() or "SGI@Admin2026"
+            pwd = os.environ.get("ADMIN_INITIAL_PASSWORD", "").strip()
+            if len(pwd) < 12:
+                raise RuntimeError("Set ADMIN_INITIAL_PASSWORD (12+ characters) to create the first admin account.")
             cursor.execute("""
                 INSERT INTO users (username, password_hash, full_name, role, department, avatar_url)
                 VALUES (?, ?, ?, ?, ?, '')
@@ -2248,6 +2261,6 @@ if __name__ == '__main__':
     print(f"🗄️  Storage: {'PostgreSQL (persistent)' if USE_PG else 'LOCAL SQLite (not persistent on cloud hosts)'}")
     print(f"🌐 Public Website: http://127.0.0.1:{port}")
     print(f"🔐 Private Admin:  http://127.0.0.1:{port}/admin")
-    print("🔑 First-run admin: username 'admin' (password from ADMIN_INITIAL_PASSWORD, or the default in the docs)")
+    print("🔑 First-run admin: username 'admin' (password from ADMIN_INITIAL_PASSWORD)")
     print("==================================================================")
-    app.run(debug=os.environ.get("FLASK_DEBUG", "1") == "1", host=os.environ.get("HOST", "127.0.0.1"), port=port)
+    app.run(debug=os.environ.get("FLASK_DEBUG", "0") == "1", host=os.environ.get("HOST", "127.0.0.1"), port=port)
