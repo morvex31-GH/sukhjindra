@@ -12,6 +12,7 @@ let loadedEvents = [];
 const EVENTS_PAGE_SIZE = 6;
 let eventsVisibleCount = EVENTS_PAGE_SIZE;
 let lastLightboxOpener = null;
+let lightboxState = { eventId: null, index: 0 };
 let currentActiveNotice = null;
 let currentSessionString = '2026–27';
 let currentCourseFilter = 'all';
@@ -157,7 +158,7 @@ function initThemeSync() {
    1. CLIENT-SIDE ROUTER (SPA PAGE NAVIGATION & VIDEO AUTOPLAY)
    ======================================================== */
 function initRouter() {
-  const routes = ['home', 'about', 'programs', 'placements', 'campus', 'contact'];
+  const routes = ['home', 'about', 'programs', 'placements', 'campus', 'contact', 'events'];
 
   function navigateTo(routeId) {
     if (!routes.includes(routeId)) {
@@ -1114,6 +1115,37 @@ function isLongEventCaption(text) {
   return t.length > 140 || (t.match(/\n/g) || []).length >= 3;
 }
 
+function getEventImages(item) {
+  const list = Array.isArray(item && item.images) ? item.images.filter(Boolean) : [];
+  if (list.length) return list;
+  return item && item.image_url ? [item.image_url] : [];
+}
+
+function renderEventMedia(item, images, title, altText) {
+  const id = Number(item.id);
+  if (images.length <= 1) {
+    return `
+        <button type="button" class="event-media" data-event-id="${id}" data-img-index="0" aria-label="View photo: ${escapeHTML(title)}">
+          <img src="${escapeHTML(images[0] || '')}" alt="${altText}" loading="lazy" decoding="async" onerror="this.parentElement.classList.add('is-broken')">
+        </button>`;
+  }
+  const slides = images.map((url, i) => `
+          <button type="button" class="event-media event-slide" data-event-id="${id}" data-img-index="${i}" aria-label="View photo ${i + 1} of ${images.length}">
+            <img src="${escapeHTML(url)}" alt="${altText} (${i + 1}/${images.length})" loading="${i === 0 ? 'eager' : 'lazy'}" decoding="async" draggable="false" onerror="this.parentElement.classList.add('is-broken')">
+          </button>`).join('');
+  const dots = images.map((_, i) =>
+    `<button type="button" class="event-dot${i === 0 ? ' active' : ''}" data-go="${i}" aria-label="Go to photo ${i + 1}"></button>`).join('');
+  return `
+        <div class="event-carousel" data-count="${images.length}" data-index="0">
+          <div class="event-carousel-track" tabindex="0" aria-label="Photo carousel, ${images.length} photos">${slides}
+          </div>
+          <span class="event-counter">1/${images.length}</span>
+          <button type="button" class="event-nav prev" data-dir="-1" aria-label="Previous photo" hidden>&#8249;</button>
+          <button type="button" class="event-nav next" data-dir="1" aria-label="Next photo">&#8250;</button>
+        </div>
+        <div class="event-dots" role="tablist" aria-label="Photo position">${dots}</div>`;
+}
+
 function renderEventsFeed() {
   const feed = document.getElementById('eventsFeed');
   if (!feed) return;
@@ -1131,6 +1163,7 @@ function renderEventsFeed() {
     const dateLabel = formatEventDate(item);
     const caption = String(item.caption || '').trim();
     const long = isLongEventCaption(caption);
+    const images = getEventImages(item);
     const altText = escapeHTML(title + (caption ? ' - ' + caption.slice(0, 90) : ''));
 
     return `
@@ -1142,9 +1175,7 @@ function renderEventsFeed() {
             ${dateLabel ? `<time>${escapeHTML(dateLabel)}</time>` : ''}
           </div>
         </header>
-        <button type="button" class="event-media" data-event-id="${Number(item.id)}" aria-label="View photo: ${escapeHTML(title)}">
-          <img src="${escapeHTML(item.image_url)}" alt="${altText}" loading="lazy" decoding="async" onerror="this.parentElement.classList.add('is-broken')">
-        </button>
+        ${renderEventMedia(item, images, title, altText)}
         <div class="event-body">
           ${caption ? `<p class="event-caption${long ? ' is-clamped' : ''}">${escapeHTML(caption)}</p>` : ''}
           ${caption && long ? '<button type="button" class="event-more-btn">more</button>' : ''}
@@ -1158,21 +1189,68 @@ function renderEventsFeed() {
   initCustomCursor();
 }
 
-function openEventLightbox(eventId, openerEl) {
+/* ---- Carousel helpers (native scroll-snap = touch swipe; arrows, dots and counter stay in sync) ---- */
+function syncCarouselUI(carousel, index) {
+  const count = Number(carousel.dataset.count) || 1;
+  index = Math.max(0, Math.min(count - 1, index));
+  carousel.dataset.index = String(index);
+  const counter = carousel.querySelector('.event-counter');
+  if (counter) counter.textContent = `${index + 1}/${count}`;
+  const prev = carousel.querySelector('.event-nav.prev');
+  const next = carousel.querySelector('.event-nav.next');
+  if (prev) prev.hidden = index <= 0;
+  if (next) next.hidden = index >= count - 1;
+  const dots = carousel.nextElementSibling;
+  if (dots && dots.classList.contains('event-dots')) {
+    dots.querySelectorAll('.event-dot').forEach((d, i) => d.classList.toggle('active', i === index));
+  }
+}
+
+function goToCarouselSlide(carousel, index) {
+  const track = carousel.querySelector('.event-carousel-track');
+  if (!track) return;
+  const count = Number(carousel.dataset.count) || 1;
+  index = Math.max(0, Math.min(count - 1, index));
+  track.scrollTo({ left: index * track.clientWidth, behavior: 'smooth' });
+  syncCarouselUI(carousel, index);
+}
+
+/* ---- Lightbox ---- */
+function updateLightbox() {
+  const item = loadedEvents.find((e) => Number(e.id) === Number(lightboxState.eventId));
+  if (!item) return;
+  const images = getEventImages(item);
+  const idx = Math.max(0, Math.min(images.length - 1, lightboxState.index));
+  lightboxState.index = idx;
+  const img = document.getElementById('eventLightboxImg');
+  img.src = images[idx];
+  img.alt = item.title || 'SGI Gurdaspur event photo';
+  document.getElementById('eventLightboxCaption').textContent = [item.title, item.caption].filter(Boolean).join(' - ');
+  const multi = images.length > 1;
+  const counter = document.getElementById('eventLightboxCounter');
+  counter.textContent = multi ? `${idx + 1}/${images.length}` : '';
+  counter.hidden = !multi;
+  document.getElementById('eventLightboxPrev').hidden = !multi || idx === 0;
+  document.getElementById('eventLightboxNext').hidden = !multi || idx === images.length - 1;
+}
+
+function openEventLightbox(eventId, openerEl, index) {
   const item = loadedEvents.find((e) => Number(e.id) === Number(eventId));
   const box = document.getElementById('eventLightbox');
   if (!item || !box) return;
-  const img = document.getElementById('eventLightboxImg');
-  const cap = document.getElementById('eventLightboxCaption');
-  img.src = item.image_url;
-  img.alt = (item.title || 'SGI Gurdaspur event photo');
-  cap.textContent = [item.title, item.caption].filter(Boolean).join(' - ');
+  lightboxState = { eventId: Number(eventId), index: Number(index) || 0 };
   lastLightboxOpener = openerEl || null;
+  updateLightbox();
   box.classList.add('open');
   box.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
   const closeBtn = document.getElementById('eventLightboxClose');
   if (closeBtn) closeBtn.focus();
+}
+
+function stepEventLightbox(dir) {
+  lightboxState.index += dir;
+  updateLightbox();
 }
 
 function closeEventLightbox() {
@@ -1201,8 +1279,41 @@ function initEventsFeed() {
       }
       return;
     }
+    const navBtn = e.target.closest('.event-nav');
+    if (navBtn) {
+      const carousel = navBtn.closest('.event-carousel');
+      if (carousel) goToCarouselSlide(carousel, (Number(carousel.dataset.index) || 0) + Number(navBtn.dataset.dir));
+      return;
+    }
+    const dot = e.target.closest('.event-dot');
+    if (dot) {
+      const carousel = dot.parentElement.previousElementSibling;
+      if (carousel && carousel.classList.contains('event-carousel')) goToCarouselSlide(carousel, Number(dot.dataset.go));
+      return;
+    }
     const media = e.target.closest('.event-media');
-    if (media) openEventLightbox(media.getAttribute('data-event-id'), media);
+    if (media) openEventLightbox(media.getAttribute('data-event-id'), media, media.getAttribute('data-img-index'));
+  });
+
+  // scroll doesn't bubble, so listen in the capture phase to track swipes on any carousel
+  let scrollTick = false;
+  feed.addEventListener('scroll', (e) => {
+    const track = e.target;
+    if (!track.classList || !track.classList.contains('event-carousel-track') || scrollTick) return;
+    scrollTick = true;
+    requestAnimationFrame(() => {
+      scrollTick = false;
+      const carousel = track.closest('.event-carousel');
+      if (carousel && track.clientWidth) syncCarouselUI(carousel, Math.round(track.scrollLeft / track.clientWidth));
+    });
+  }, true);
+
+  feed.addEventListener('keydown', (e) => {
+    const track = e.target.closest && e.target.closest('.event-carousel-track');
+    if (!track || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+    const carousel = track.closest('.event-carousel');
+    goToCarouselSlide(carousel, (Number(carousel.dataset.index) || 0) + (e.key === 'ArrowRight' ? 1 : -1));
+    e.preventDefault();
   });
 
   const showMore = document.getElementById('eventsMoreBtn');
@@ -1217,7 +1328,30 @@ function initEventsFeed() {
   const closeBtn = document.getElementById('eventLightboxClose');
   if (closeBtn) closeBtn.addEventListener('click', closeEventLightbox);
   if (box) box.addEventListener('click', (e) => { if (e.target === box) closeEventLightbox(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeEventLightbox(); });
+  const prev = document.getElementById('eventLightboxPrev');
+  const next = document.getElementById('eventLightboxNext');
+  if (prev) prev.addEventListener('click', () => stepEventLightbox(-1));
+  if (next) next.addEventListener('click', () => stepEventLightbox(1));
+
+  // swipe inside the lightbox
+  let touchX = null;
+  if (box) {
+    box.addEventListener('touchstart', (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+    box.addEventListener('touchend', (e) => {
+      if (touchX === null) return;
+      const dx = e.changedTouches[0].clientX - touchX;
+      touchX = null;
+      if (Math.abs(dx) > 50) stepEventLightbox(dx < 0 ? 1 : -1);
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    const open = box && box.classList.contains('open');
+    if (!open) return;
+    if (e.key === 'Escape') closeEventLightbox();
+    else if (e.key === 'ArrowLeft') stepEventLightbox(-1);
+    else if (e.key === 'ArrowRight') stepEventLightbox(1);
+  });
 }
 
 /* ========================================================
