@@ -53,12 +53,13 @@ app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get("COOKIE_SECURE", "").strip() == "1"
-app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024  # 25 MB max upload
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB per request (an Events post can carry up to 20 photos)
 
 EMAIL_REGEX = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 ALLOWED_AVATAR_EXTS = {'.jpg', '.jpeg', '.png', '.webp'}
 EVENT_IMAGE_MIME = {'.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif'}
 MAX_EVENT_IMAGE_BYTES = 8 * 1024 * 1024   # 8 MB per event photo
+MAX_EVENT_IMAGES = 20                      # photos per Events post
 
 # -------------------------------------------------------------
 # Default Seed Data for Notices, Programs & Site Content
@@ -373,7 +374,7 @@ _SCHEMA_PG = [
         created_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC'))""",
     """CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY, title TEXT DEFAULT '', caption TEXT DEFAULT '', event_date TEXT DEFAULT '',
-        image_url TEXT NOT NULL, is_active INTEGER DEFAULT 1, created_by TEXT DEFAULT 'Admin',
+        image_url TEXT NOT NULL, images_json TEXT DEFAULT '[]', is_active INTEGER DEFAULT 1, created_by TEXT DEFAULT 'Admin',
         created_at TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'UTC'))""",
     """CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)""",
 ]
@@ -407,7 +408,7 @@ _SCHEMA_SQLITE = [
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""",
     """CREATE TABLE IF NOT EXISTS events (
         id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT DEFAULT '', caption TEXT DEFAULT '', event_date TEXT DEFAULT '',
-        image_url TEXT NOT NULL, is_active INTEGER DEFAULT 1, created_by TEXT DEFAULT 'Admin',
+        image_url TEXT NOT NULL, images_json TEXT DEFAULT '[]', is_active INTEGER DEFAULT 1, created_by TEXT DEFAULT 'Admin',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP)""",
     """CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)""",
 ]
@@ -464,6 +465,13 @@ def init_db():
                 cursor.execute("ALTER TABLE notices ADD COLUMN pdf_url TEXT DEFAULT ''")
             if 'pdf_filename' not in notice_cols:
                 cursor.execute("ALTER TABLE notices ADD COLUMN pdf_filename TEXT DEFAULT ''")
+
+            cursor.execute("PRAGMA table_info(events)")
+            event_cols = {row[1] for row in cursor.fetchall()}
+            if 'images_json' not in event_cols:
+                cursor.execute("ALTER TABLE events ADD COLUMN images_json TEXT DEFAULT '[]'")
+        else:
+            cursor.execute("ALTER TABLE events ADD COLUMN IF NOT EXISTS images_json TEXT DEFAULT '[]'")
 
         def seed_admin():
             pwd = os.environ.get("ADMIN_INITIAL_PASSWORD", "").strip() or "SGI@Admin2026"
@@ -608,16 +616,30 @@ def remove_avatar_file(avatar_url):
 
 
 # ---- Events & Activities (social feed) helpers ----
-EVENT_COLUMNS = "id, title, caption, event_date, image_url, is_active, created_by, created_at"
+EVENT_COLUMNS = "id, title, caption, event_date, image_url, is_active, created_by, created_at, images_json"
+
+
+def _parse_event_images(images_json, cover_url):
+    """Returns the post's photo list. Older single-image posts (no images_json) fall back to [image_url]."""
+    try:
+        imgs = json.loads(images_json) if images_json else []
+    except (TypeError, ValueError):
+        imgs = []
+    imgs = [u for u in imgs if isinstance(u, str) and u]
+    if not imgs and cover_url:
+        imgs = [cover_url]
+    return imgs
 
 
 def row_to_event_dict(r):
+    images = _parse_event_images(r[8] if len(r) > 8 else "", r[4])
     return {
         "id": r[0],
         "title": r[1] or "",
         "caption": r[2] or "",
         "event_date": r[3] or "",
-        "image_url": r[4] or "",
+        "image_url": images[0] if images else (r[4] or ""),
+        "images": images,
         "is_active": bool(r[5]),
         "created_by": r[6],
         "created_at": r[7]
@@ -1698,6 +1720,25 @@ def admin_list_events():
     return jsonify({"events": fetch_events(active_only=False)})
 
 
+def _collect_event_uploads():
+    """All uploaded photos of this request (new 'image_files' field, legacy 'image_file' also accepted)."""
+    files = request.files.getlist('image_files') + request.files.getlist('image_file')
+    return [f for f in files if f and f.filename]
+
+
+def _save_event_uploads(uploads):
+    """Validates & stores every photo; if any fails, the ones already stored are rolled back."""
+    saved = []
+    try:
+        for f in uploads:
+            saved.append(save_event_image(f))
+    except ValueError:
+        for url in saved:
+            remove_event_image_file(url)
+        raise
+    return saved
+
+
 @app.route('/api/admin/events', methods=['POST'])
 @login_required
 def admin_create_event():
@@ -1717,12 +1758,14 @@ def admin_create_event():
     if not caption:
         return jsonify({"success": False, "message": "A caption / description is required."}), 400
 
-    uploaded_file = request.files.get('image_file') if is_multipart else None
-    if not uploaded_file or not uploaded_file.filename:
-        return jsonify({"success": False, "message": "Please choose a photo for this post."}), 400
+    uploads = _collect_event_uploads() if is_multipart else []
+    if not uploads:
+        return jsonify({"success": False, "message": "Please choose at least one photo for this post."}), 400
+    if len(uploads) > MAX_EVENT_IMAGES:
+        return jsonify({"success": False, "message": f"You can upload up to {MAX_EVENT_IMAGES} photos per post."}), 400
 
     try:
-        image_url = save_event_image(uploaded_file)
+        image_urls = _save_event_uploads(uploads)
     except ValueError as ve:
         return jsonify({"success": False, "message": str(ve)}), 400
 
@@ -1730,19 +1773,20 @@ def admin_create_event():
     try:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO events (title, caption, event_date, image_url, is_active, created_by)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (title, caption, event_date, image_url, is_active, created_by))
+            INSERT INTO events (title, caption, event_date, image_url, images_json, is_active, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (title, caption, event_date, image_urls[0], json.dumps(image_urls), is_active, created_by))
         conn.commit()
         new_id = cursor.lastrowid
     except Exception as e:
         conn.rollback()
-        remove_event_image_file(image_url)
+        for url in image_urls:
+            remove_event_image_file(url)
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         conn.close()
 
-    return jsonify({"success": True, "id": new_id, "image_url": image_url}), 201
+    return jsonify({"success": True, "id": new_id, "image_url": image_urls[0], "images": image_urls}), 201
 
 
 @app.route('/api/admin/events/<int:event_id>', methods=['PUT'])
@@ -1752,8 +1796,8 @@ def admin_update_event(event_id):
     data = request.form if is_multipart else (request.get_json(silent=True) or {})
 
     conn = get_db()
-    new_image_url = None
-    old_image_url = ""
+    new_urls = []
+    removed_urls = []
     try:
         cursor = conn.cursor()
         cursor.execute(f"SELECT {EVENT_COLUMNS} FROM events WHERE id = ?", (event_id,))
@@ -1773,32 +1817,48 @@ def admin_update_event(event_id):
 
         is_active = (1 if _truthy(data.get('is_active')) else 0) if 'is_active' in data else existing[5]
 
-        image_url = existing[4] or ""
-        old_image_url = image_url
-        uploaded_file = request.files.get('image_file') if is_multipart else None
-        if uploaded_file and uploaded_file.filename:
-            try:
-                new_image_url = save_event_image(uploaded_file)
-            except ValueError as ve:
-                return jsonify({"success": False, "message": str(ve)}), 400
-            image_url = new_image_url
+        current_images = _parse_event_images(existing[8], existing[4])
+        final_images = current_images
+
+        uploads = _collect_event_uploads() if is_multipart else []
+        if 'keep_images' in data or uploads:
+            # keep_images = JSON list of the CURRENT photos to keep, in display order (others are removed)
+            if 'keep_images' in data:
+                try:
+                    requested = json.loads(data.get('keep_images') or '[]')
+                except ValueError:
+                    return jsonify({"success": False, "message": "Invalid photo list."}), 400
+                kept = [u for u in requested if u in current_images]
+            else:
+                kept = list(current_images)
+            if len(kept) + len(uploads) > MAX_EVENT_IMAGES:
+                return jsonify({"success": False, "message": f"A post can have up to {MAX_EVENT_IMAGES} photos."}), 400
+            if uploads:
+                try:
+                    new_urls = _save_event_uploads(uploads)
+                except ValueError as ve:
+                    return jsonify({"success": False, "message": str(ve)}), 400
+            final_images = kept + new_urls
+            if not final_images:
+                return jsonify({"success": False, "message": "A post needs at least one photo."}), 400
+            removed_urls = [u for u in current_images if u not in final_images]
 
         cursor.execute("""
-            UPDATE events SET title = ?, caption = ?, event_date = ?, image_url = ?, is_active = ?
+            UPDATE events SET title = ?, caption = ?, event_date = ?, image_url = ?, images_json = ?, is_active = ?
             WHERE id = ?
-        """, (title, caption, event_date, image_url, is_active, event_id))
+        """, (title, caption, event_date, final_images[0], json.dumps(final_images), is_active, event_id))
         conn.commit()
     except Exception as e:
         conn.rollback()
-        if new_image_url:
-            remove_event_image_file(new_image_url)
+        for url in new_urls:
+            remove_event_image_file(url)
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         conn.close()
 
-    if new_image_url:
-        remove_event_image_file(old_image_url)       # only after the new photo is safely saved
-    return jsonify({"success": True, "image_url": new_image_url or old_image_url})
+    for url in removed_urls:                      # only after the new photos are safely saved
+        remove_event_image_file(url)
+    return jsonify({"success": True, "image_url": final_images[0], "images": final_images})
 
 
 @app.route('/api/admin/events/<int:event_id>', methods=['DELETE'])
@@ -1807,16 +1867,26 @@ def admin_delete_event(event_id):
     conn = get_db()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT image_url FROM events WHERE id = ?", (event_id,))
+        cursor.execute("SELECT image_url, images_json FROM events WHERE id = ?", (event_id,))
         row = cursor.fetchone()
         if not row:
             return jsonify({"success": False, "message": "Event post not found."}), 404
+        urls = _parse_event_images(row[1], row[0])
         cursor.execute("DELETE FROM events WHERE id = ?", (event_id,))
         conn.commit()
-        remove_event_image_file(row[0])
+        for url in urls:
+            remove_event_image_file(url)
     finally:
         conn.close()
     return jsonify({"success": True})
+
+
+@app.errorhandler(413)
+def request_too_large(_e):
+    msg = "Upload is too large. Please send fewer or smaller files."
+    if request.path.startswith('/api/'):
+        return jsonify({"success": False, "message": msg}), 413
+    return msg, 413
 
 
 # -------------------------------------------------------------
