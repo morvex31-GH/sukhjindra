@@ -7,21 +7,16 @@
   <meta name="theme-color" content="#0B2545">
   <title>SGI Gurdaspur | Sukhjinder Group of Institutes</title>
   
-  <!-- Fonts: Syne (Display) & Plus Jakarta Sans (Body) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@700;800;900&display=swap" rel="stylesheet">
   
-  <!-- jsPDF Engine for Direct Circular & Prospectus Downloads -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
-  <!-- GSAP (GreenSock) for logo animations -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 
   <link rel="stylesheet" href="styles.css?v=20261126">
 </head>
 <body>
-  <!-- Logo Preloader (GSAP): logo scales in at center, then glides into the navbar -->
   <div class="logo-preloader" id="logoPreloader" aria-hidden="true">
     <div class="preloader-bg"></div>
     <div class="preloader-aura"></div>
@@ -29,13 +24,9 @@
     <span class="preloader-logo is-badge" id="preloaderLogoBadge" style="display:none;">SGI</span>
   </div>
 
-  <!-- Ambient Noise Texture -->
   <div class="noise-overlay" aria-hidden="true"></div>
-
-  <!-- Magnetic Custom Cursor -->
   <div class="custom-cursor" id="cursor"></div>
 
-  <!-- Sticky Frosted Header -->
   <header class="site-header">
     <div class="header-inner">
       <a href="#home" class="brand-logo route-link" data-route="home">
@@ -47,7 +38,6 @@
         </div>
       </a>
 
-      <!-- Desktop Navigation -->
       <nav class="nav-links">
         <a href="#home" class="nav-item route-link active" data-route="home">Home</a>
         <a href="#about" class="nav-item route-link" data-route="about">About</a>
@@ -60,7 +50,6 @@
 
       <div class="nav-cta">
         <button class="btn btn-primary header-apply-btn magnetic-btn" onclick="openModal()">Apply Now</button>
-        
         <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Open mobile navigation menu">
           <span class="hamburger-bar"></span>
           <span class="hamburger-bar"></span>
@@ -70,7 +59,6 @@
     </div>
   </header>
 
-  <!-- Mobile Slide-In Navigation Drawer -->
   <div class="mobile-nav-drawer" id="mobileNavDrawer" aria-hidden="true">
     <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
     <div class="mobile-nav-inner">
@@ -83,34 +71,13 @@
       </div>
 
       <nav class="mobile-nav-links">
-        <a href="#home" class="mobile-nav-item route-link active" data-route="home">
-          <span>Home</span>
-          <span class="m-arrow">&rarr;</span>
-        </a>
-        <a href="#about" class="mobile-nav-item route-link" data-route="about">
-          <span>About SGI Legacy</span>
-          <span class="m-arrow">&rarr;</span>
-        </a>
-        <a href="#programs" class="mobile-nav-item route-link" data-route="programs">
-          <span>Degree Programs</span>
-          <span class="m-arrow">&rarr;</span>
-        </a>
-        <a href="#placements" class="mobile-nav-item route-link" data-route="placements">
-          <span>Placements</span>
-          <span class="m-arrow">&rarr;</span>
-        </a>
-        <a href="#campus" class="mobile-nav-item route-link" data-route="campus">
-          <span>Campus &amp; Facilities</span>
-          <span class="m-arrow">&rarr;</span>
-        </a>
-        <a href="#contact" class="mobile-nav-item route-link" data-route="contact">
-          <span>Inquiry &amp; Contact Desk</span>
-          <span class="m-arrow">&rarr;</span>
-        </a>
-        <a href="#events" class="mobile-nav-item route-link" data-route="events">
-          <span>Events &amp; Activities</span>
-          <span class="m-arrow">&rarr;</span>
-        </a>
+        <a href="#home" class="mobile-nav-item route-link active" data-route="home"><span>Home</span><span class="m-arrow">&rarr;</span></a>
+        <a href="#about" class="mobile-nav-item route-link" data-route="about"><span>About SGI Legacy</span><span class="m-arrow">&rarr;</span></a>
+        <a href="#programs" class="mobile-nav-item route-link" data-route="programs"><span>Degree Programs</span><span class="m-arrow">&rarr;</span></a>
+        <a href="#placements" class="mobile-nav-item route-link" data-route="placements"><span>Placements</span><span class="m-arrow">&rarr;</span></a>
+        <a href="#campus" class="mobile-nav-item route-link" data-route="campus"><span>Campus &amp; Facilities</span><span class="m-arrow">&rarr;</span></a>
+        <a href="#contact" class="mobile-nav-item route-link" data-route="contact"><span>Inquiry &amp; Contact Desk</span><span class="m-arrow">&rarr;</span></a>
+        <a href="#events" class="mobile-nav-item route-link" data-route="events"><span>Events &amp; Activities</span><span class="m-arrow">&rarr;</span></a>
       </nav>
 
       <div class="mobile-nav-bottom">
@@ -123,16 +90,12 @@
 
   <main id="app-container">
 
-    <!-- ==================== 1. HOME VIEW (FULL SCROLLABLE LANDING PAGE) ==================== -->
     <section class="page-view active" id="view-home">
-      <!-- Hero Section with Slow Smooth Crossfade Slideshow (6.5s interval, 1.4s transition) -->
       <div class="hero-section">
         <div class="hero-slideshow-container" id="heroSlideshow">
-          <!-- Slide 1: Panoramic Aerial Campus -->
           <div class="hero-slide active">
             <img src="campus-hero.jpeg" onerror="if(!this.dataset.fallback){this.dataset.fallback=1;this.src='campus-hero.jpg';}else{this.src='https://sgigurdaspur.org/wp-content/uploads/2026/01/SukhJinder-Group-of-Institutes.jpg';}" alt="SGI Gurdaspur Aerial Campus View" class="hero-bg-img">
           </div>
-          <!-- Slide 2: Wing B Academic Block & Gardens -->
           <div class="hero-slide">
             <img src="campus-wing-b.jpeg" onerror="if(!this.dataset.fallback){this.dataset.fallback=1;this.src='campus-wing-b.jpg';}else{this.src='https://sgigurdaspur.org/wp-content/uploads/2026/01/SukhJinder-Group-of-Institutes.jpg';}" alt="SGI Wing B Academic Block" class="hero-bg-img">
           </div>
@@ -150,9 +113,7 @@
             <span class="hashtag-highlight" id="dynHeroTitleHighlight">#Push Beyond</span> <span id="dynHeroTitleRest">Boundaries</span>
           </h1>
 
-          <h2 class="hero-subheadline" id="dynHeroSubheadline">
-            Where Learning Meets Lifestyle
-          </h2>
+          <h2 class="hero-subheadline" id="dynHeroSubheadline">Where Learning Meets Lifestyle</h2>
 
           <p class="hero-subtitle" id="dynHeroSubtitle">
             Pioneering higher education across Engineering, Pharmacy, Nursing, Allied Health, Computer Applications &amp; Management on a lush 10+ acre campus in Gurdaspur.
@@ -169,7 +130,6 @@
             </button>
           </div>
 
-          <!-- Subtle Slideshow Progress Indicators -->
           <div class="hero-slide-indicators" aria-label="Hero background slide indicators">
             <button type="button" class="hero-indicator active" data-slide="0" aria-label="View Campus Aerial Slide"></button>
             <button type="button" class="hero-indicator" data-slide="1" aria-label="View Academic Block Slide"></button>
@@ -177,7 +137,6 @@
         </div>
       </div>
 
-      <!-- National-Level Highlights & Legacy Banner -->
       <section class="national-highlights-ribbon">
         <div class="highlights-inner">
           <div class="highlight-item">
@@ -218,7 +177,6 @@
         </div>
       </section>
 
-      <!-- Home Bento Grid: Accreditations + Flagship Academics + Notice Board -->
       <div class="section-container">
         <div class="section-header">
           <span class="section-eyebrow">Academic Ecosystem</span>
@@ -226,7 +184,6 @@
         </div>
 
         <div class="bento-grid">
-          <!-- Bento 1: Authentic Accreditations with Recognizable Council Emblems -->
           <div class="bento-card bento-span-3 bento-accreditations-full">
             <div class="accreditations-head-group">
               <span class="card-tag">Accreditations &amp; Statutory Approvals</span>
@@ -235,7 +192,6 @@
             </div>
             
             <div class="regulatory-emblems-grid">
-              <!-- AICTE -->
               <a href="https://www.aicte-india.org/" target="_blank" rel="noopener noreferrer" class="emblem-card">
                 <div class="emblem-icon-wrap" aria-hidden="true">
                   <svg viewBox="0 0 80 80" class="council-svg-emblem">
@@ -253,7 +209,6 @@
                 <span class="emblem-arrow">↗</span>
               </a>
 
-              <!-- IKGPTU -->
               <a href="https://ptu.ac.in/" target="_blank" rel="noopener noreferrer" class="emblem-card">
                 <div class="emblem-icon-wrap" aria-hidden="true">
                   <svg viewBox="0 0 80 80" class="council-svg-emblem">
@@ -271,7 +226,6 @@
                 <span class="emblem-arrow">↗</span>
               </a>
 
-              <!-- PCI -->
               <a href="https://www.pci.nic.in/" target="_blank" rel="noopener noreferrer" class="emblem-card">
                 <div class="emblem-icon-wrap" aria-hidden="true">
                   <svg viewBox="0 0 80 80" class="council-svg-emblem">
@@ -290,7 +244,6 @@
                 <span class="emblem-arrow">↗</span>
               </a>
 
-              <!-- INC -->
               <a href="https://indiannursingcouncil.org/" target="_blank" rel="noopener noreferrer" class="emblem-card">
                 <div class="emblem-icon-wrap" aria-hidden="true">
                   <svg viewBox="0 0 80 80" class="council-svg-emblem">
@@ -308,7 +261,6 @@
                 <span class="emblem-arrow">↗</span>
               </a>
 
-              <!-- BFUHS -->
               <a href="https://bfuhs.ac.in/" target="_blank" rel="noopener noreferrer" class="emblem-card">
                 <div class="emblem-icon-wrap" aria-hidden="true">
                   <svg viewBox="0 0 80 80" class="council-svg-emblem">
@@ -326,7 +278,6 @@
                 <span class="emblem-arrow">↗</span>
               </a>
 
-              <!-- PSBTE & IT -->
               <a href="https://www.punjabteched.com/" target="_blank" rel="noopener noreferrer" class="emblem-card">
                 <div class="emblem-icon-wrap" aria-hidden="true">
                   <svg viewBox="0 0 80 80" class="council-svg-emblem">
@@ -345,7 +296,6 @@
             </div>
           </div>
 
-          <!-- Bento 2: Featured Degree Programs Overview -->
           <div class="bento-card bento-span-1">
             <div>
               <div class="card-tag">Flagship Academics</div>
@@ -364,7 +314,6 @@
             </div>
           </div>
 
-          <!-- Bento 3: Interactive Notice Board -->
           <div class="bento-card bento-span-2 bento-notice-hub" id="noticeHubCard">
             <div class="bento-header-flex">
               <div>
@@ -397,7 +346,6 @@
         </div>
       </div>
 
-      <!-- ==================== HOME PREVIEW 1: ABOUT SGI & HERITAGE ==================== -->
       <div class="section-container home-preview-section">
         <div class="home-section-head">
           <div>
@@ -446,7 +394,6 @@
         </div>
       </div>
 
-      <!-- ==================== HOME PREVIEW 2: DEGREE PROGRAMS ==================== -->
       <div class="section-container home-preview-section">
         <div class="home-section-head">
           <div>
@@ -496,7 +443,6 @@
         </div>
       </div>
 
-      <!-- ==================== HOME PREVIEW 3: PLACEMENTS & RECRUITERS ==================== -->
       <div class="section-container home-preview-section">
         <div class="home-section-head">
           <div>
@@ -548,7 +494,6 @@
         </div>
       </div>
 
-      <!-- ==================== HOME PREVIEW 4: CAMPUS & INFRASTRUCTURE ==================== -->
       <div class="section-container home-preview-section">
         <div class="home-section-head">
           <div>
@@ -595,7 +540,6 @@
         </div>
       </div>
 
-      <!-- Admissions Banner -->
       <div class="section-container">
         <div class="cta-banner">
           <div>
@@ -607,7 +551,6 @@
       </div>
     </section>
 
-    <!-- ==================== 2. ABOUT VIEW ==================== -->
     <section class="page-view" id="view-about">
       <div class="page-header">
         <span class="section-eyebrow">Legacy, Vision &amp; Verified Realities</span>
@@ -616,7 +559,6 @@
       </div>
 
       <div class="section-container">
-        <!-- Verified Numerical Facts Row -->
         <div class="facts-highlight-row">
           <div class="fact-mini-box">
             <span class="fact-mini-stat" id="dynFactYears">25+</span>
@@ -654,7 +596,6 @@
             </div>
           </div>
 
-          <!-- Campus Life & Holistic Growth Bento Card -->
           <div class="bento-card bento-span-1 bento-campus-life">
             <div>
               <div class="card-tag">Campus Life &amp; Achievements</div>
@@ -672,7 +613,6 @@
             </div>
           </div>
 
-          <!-- Video & Photo Media Showcase with Autoplay -->
           <div class="bento-card bento-span-3 bento-media-showcase">
             <div class="media-showcase-header">
               <div>
@@ -684,7 +624,6 @@
             </div>
 
             <div class="about-media-grid">
-              <!-- YouTube Promotional Video (responsive 16:9) -->
               <div class="media-card media-video-card">
                 <div class="video-wrapper">
                   <iframe src="https://www.youtube.com/embed/5UrrVoiXDmo?si=AGC_bGTLXV-KsPBJ&amp;enablejsapi=1" title="SGI Gurdaspur promotional video" class="about-video-embed" width="560" height="315" frameborder="0" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
@@ -695,7 +634,6 @@
                 </div>
               </div>
 
-              <!-- Photo 1: Campus Aerial View -->
               <div class="media-card media-photo-card">
                 <div class="photo-wrapper">
                   <img src="about-1.jpg" data-fallback-srcs="images/about-1.jpg|images.jpg" alt="Aerial view of SGI Gurdaspur campus with academic blocks and green lawns" class="about-showcase-photo" loading="lazy">
@@ -707,19 +645,16 @@
                 </div>
               </div>
 
-              <!-- Photo 2: Panoramic Campus Banner (full width) -->
               <div class="media-card media-photo-card media-card-wide">
                 <div class="photo-wrapper photo-wrapper-wide">
-                  <img src="about-2.jpg" data-fallback-srcs="images/about-2.jpg|sukhjinder_group_of_institutes_cover.jpg" alt="Panoramic aerial view of Sukhjinder Group of Institutes campus buildings" class="about-showcase-photo" loading="lazy">
+                  <img src="assets/images/campus-hero2.jpg" alt="Panoramic aerial view of Sukhjinder Group of Institutes campus buildings" class="about-showcase-photo" loading="lazy">
                   <div class="video-tag-pill">Panoramic View</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Leadership Messages (Chairman & Vice-Chairman with Portraits) -->
           <div class="bento-span-3 leadership-grid">
-            <!-- Chairman Card -->
             <div class="bento-card leadership-card">
               <div>
                 <div class="leadership-profile-head">
@@ -740,12 +675,11 @@
                 </div>
 
                 <blockquote class="leadership-quote">
-                  “It is with great pride that I welcome you to Sukhjinder Group of Institutes, a pioneer in professional education. Our goal is to nurture creative, result-oriented, and skilled students who are ready to excel in their careers and contribute meaningfully to society. Education is our foremost priority, and we have established campuses in the Shivalik Hills to provide students with a robust environment to develop professional expertise and leadership skills.”
+                  "It is with great pride that I welcome you to Sukhjinder Group of Institutes, a pioneer in professional education. Our goal is to nurture creative, result-oriented, and skilled students who are ready to excel in their careers and contribute meaningfully to society. Education is our foremost priority, and we have established campuses in the Shivalik Hills to provide students with a robust environment to develop professional expertise and leadership skills."
                 </blockquote>
               </div>
             </div>
 
-            <!-- Vice-Chairman Card -->
             <div class="bento-card leadership-card">
               <div>
                 <div class="leadership-profile-head">
@@ -766,7 +700,7 @@
                 </div>
 
                 <blockquote class="leadership-quote">
-                  “I extend a warm welcome to all students considering Sukhjinder Group of Institutes. Our campuses in Gurdaspur and Dunera offer a nurturing and motivating environment, supported by experienced faculty members dedicated to student development. SGI is designed to meet the needs of a diverse student community, promoting academic excellence, skill development, and life-long learning. I invite students to join us and explore the many opportunities for personal and professional growth that SGI provides.”
+                  "I extend a warm welcome to all students considering Sukhjinder Group of Institutes. Our campuses in Gurdaspur and Dunera offer a nurturing and motivating environment, supported by experienced faculty members dedicated to student development. SGI is designed to meet the needs of a diverse student community, promoting academic excellence, skill development, and life-long learning. I invite students to join us and explore the many opportunities for personal and professional growth that SGI provides."
                 </blockquote>
               </div>
             </div>
@@ -791,7 +725,6 @@
       </div>
     </section>
 
-    <!-- ==================== 3. DEGREE PROGRAMS VIEW ==================== -->
     <section class="page-view" id="view-programs">
       <div class="page-header">
         <span class="section-eyebrow">Academic Catalog</span>
@@ -800,7 +733,6 @@
       </div>
 
       <div class="section-container">
-        <!-- Search Course / Degree by Typing -->
         <div class="programs-search-wrap">
           <div class="programs-search-box">
             <span class="search-icon" aria-hidden="true">🔍</span>
@@ -815,7 +747,6 @@
           </div>
         </div>
 
-        <!-- Interactive Discipline Filters -->
         <div class="filter-wrapper">
           <div class="filter-tabs">
             <button class="filter-btn active" data-filter="all">All Degrees</button>
@@ -828,7 +759,6 @@
         </div>
 
         <div class="courses-grid" id="coursesGrid">
-          <!-- Fallback static list; hydrated dynamically from /api/public-content -->
           <div class="course-pill" data-category="engineering">
             <div>
               <span class="course-code">AICTE • IKGPTU • 4 YEARS</span>
@@ -866,7 +796,6 @@
       </div>
     </section>
 
-    <!-- ==================== 4. PLACEMENTS VIEW ==================== -->
     <section class="page-view" id="view-placements">
       <div class="page-header">
         <span class="section-eyebrow">Industry Connect</span>
@@ -1034,7 +963,6 @@
       </div>
     </section>
 
-    <!-- ==================== 5. CAMPUS VIEW ==================== -->
     <section class="page-view campus-view-styled" id="view-campus">
       <div class="campus-backdrop-media">
         <img 
@@ -1099,7 +1027,6 @@
       </div>
     </section>
 
-    <!-- ==================== 6. CONTACT & INQUIRY DESK ==================== -->
     <section class="page-view" id="view-contact">
       <div class="page-header">
         <span class="section-eyebrow">Direct Admissions &amp; Campus Support</span>
@@ -1109,7 +1036,6 @@
 
       <div class="section-container">
         <div class="bento-grid">
-          <!-- Official Contact Details Bento Card -->
           <div class="bento-card bento-span-1">
             <div>
               <div class="card-tag">Official Coordinates</div>
@@ -1143,7 +1069,6 @@
             </div>
           </div>
 
-          <!-- Contact Inquiry Form Bento Card -->
           <div class="bento-card bento-span-2 bento-card-overflow-visible">
             <div>
               <div class="card-tag">Campus Inquiry Form</div>
@@ -1173,7 +1098,6 @@
                   </div>
                 </div>
 
-                <!-- Searchable Course / Degree Combobox -->
                 <div class="form-group">
                   <label for="routeCourse">Select or Type Course / Degree *</label>
                   <div class="course-combobox" id="routeCourseCombobox">
@@ -1211,7 +1135,6 @@
             </div>
           </div>
 
-          <!-- Dynamic Admissions & Academic Counseling Team Profiles -->
           <div class="bento-card bento-span-3">
             <div>
               <div class="card-tag">Admissions &amp; Faculty Directory</div>
@@ -1226,8 +1149,6 @@
       </div>
     </section>
 
-
-    <!-- ==================== 7. EVENTS & ACTIVITIES VIEW (social-style feed) ==================== -->
     <section class="page-view events-view" id="view-events">
       <div class="page-header">
         <span class="section-eyebrow">Campus Feed</span>
@@ -1247,7 +1168,6 @@
 
   </main>
 
-  <!-- Interactive Quick Application Modal -->
   <div class="modal-backdrop" id="appModal" aria-hidden="true">
     <div class="modal-card">
       <button class="modal-close" onclick="closeModal()" aria-label="Close Application Modal">&times;</button>
@@ -1309,7 +1229,6 @@
     </div>
   </div>
 
-  <!-- Interactive Notice Details Modal with Attached PDF Preview & Download -->
   <div class="modal-backdrop" id="noticeModal" aria-hidden="true">
     <div class="modal-card modal-notice-expanded">
       <button class="modal-close" onclick="closeNoticeModal()" aria-label="Close Notice Modal">&times;</button>
@@ -1327,7 +1246,6 @@
       <div class="notice-modal-body">
         <p id="modalNoticeBody" style="color: var(--text-muted); line-height: 1.8; font-size: 0.95rem; white-space: pre-line;">Official circular detailed contents will appear here.</p>
 
-        <!-- Embedded PDF Viewer when Notice has an Attached PDF -->
         <div id="modalNoticePdfContainer" class="notice-pdf-preview-box" style="display:none;">
           <div class="notice-pdf-preview-header">
             <span id="modalNoticePdfFilename">📄 Attached Official Circular.pdf</span>
@@ -1345,17 +1263,14 @@
     </div>
   </div>
 
-  <!-- Comprehensive Multi-Column Footer -->
   <footer class="site-footer">
     <div class="footer-inner">
-      <!-- Column 1: Brand & Contact -->
       <div class="footer-col footer-brand-col">
         <h3 style="font-family: var(--font-display); color: var(--text-main); margin-bottom: 0.5rem;">Sukhjinder Group of Institutes</h3>
         <p id="dynFooterAddress" style="color: var(--text-muted); font-size: 0.9rem;">V.P.O. Hayat Nagar, Hardochhani Road, Gurdaspur, Punjab – 143521</p>
         <p style="margin-top: 0.5rem; color: var(--text-muted); font-size: 0.9rem;">Admissions Helpline: <strong id="dynFooterPhone" style="color: var(--accent-text);">+91 93160 93494</strong></p>
         <p style="color: var(--text-muted); font-size: 0.9rem;">Campus Admin: <a href="mailto:admin@sgigurdaspur.org" id="dynFooterEmail" style="color: var(--text-main); text-decoration: none;">admin@sgigurdaspur.org</a></p>
 
-        <!-- Official Clickable Social Media Handles -->
         <div class="social-handles-row">
           <a href="https://www.instagram.com/sukhjindergroupofinstitutes_?vrfl=MXY5OGs4MzdmYWFsdA==" target="_blank" rel="noopener noreferrer" class="social-btn" aria-label="SGI Official Instagram">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
@@ -1380,7 +1295,6 @@
         </div>
       </div>
 
-      <!-- Column 2: About SGI -->
       <div class="footer-col">
         <h4 class="footer-col-title">About SGI</h4>
         <p class="footer-about-blurb"><span data-cms="stat_years">25+</span> years of excellence under the S. Sukhjinder Singh Memorial Education Society.</p>
@@ -1392,7 +1306,6 @@
         </ul>
       </div>
 
-      <!-- Column 3: Degree Programs -->
       <div class="footer-col">
         <h4 class="footer-col-title">Degree Programs</h4>
         <ul class="footer-links-list">
@@ -1404,7 +1317,6 @@
         </ul>
       </div>
 
-      <!-- Column 4: Campus & Placements -->
       <div class="footer-col">
         <h4 class="footer-col-title">Campus &amp; Placements</h4>
         <ul class="footer-links-list">
@@ -1416,7 +1328,6 @@
         </ul>
       </div>
 
-      <!-- Column 5: Mandatory Disclosures & Help -->
       <div class="footer-col">
         <h4 class="footer-col-title">Mandatory Disclosures &amp; Help</h4>
         <ul class="footer-links-list">
@@ -1434,11 +1345,13 @@
       <div class="sub-footer-inner">
         <p>© <span id="dynamic-year"></span> Sukhjinder Group of Institutes. All rights reserved.</p>
         <p style="color: var(--text-muted); font-size: 0.8rem;">Affiliated to IKGPTU Jalandhar, BFUHS Faridkot &amp; PSBTE • Approved by AICTE, PCI &amp; INC New Delhi</p>
+        <p style="margin-top: 0.6rem;">
+          <a href="admin.html" style="color: var(--accent-text); font-size: 0.8rem; font-weight: 700; text-decoration: none;">🔐 Staff Portal →</a>
+        </p>
       </div>
     </div>
   </footer>
 
-  <!-- Events photo viewer -->
   <div class="event-lightbox" id="eventLightbox" role="dialog" aria-modal="true" aria-label="Event photo viewer" aria-hidden="true">
     <button type="button" class="event-lightbox-close" id="eventLightboxClose" aria-label="Close photo">&times;</button>
     <button type="button" class="event-nav prev event-lightbox-nav" id="eventLightboxPrev" aria-label="Previous photo">&#8249;</button>
