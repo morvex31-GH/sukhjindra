@@ -11,6 +11,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import sqlite3
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import secrets
 import csv
 
