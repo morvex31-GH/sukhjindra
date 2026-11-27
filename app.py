@@ -1312,6 +1312,11 @@ def admin_logout():
     return resp
 
 
+@app.route('/admin.html')
+def redirect_admin_html():
+    return redirect('/admin')
+
+
 @app.route('/admin', strict_slashes=False)
 @app.route('/admin/', strict_slashes=False)
 @login_required
